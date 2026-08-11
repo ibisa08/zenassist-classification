@@ -1,0 +1,53 @@
+# --- donnees ---------------------------------------------------------------
+# TOUT `data/` est exclu, pas seulement raw/ et processed/. Enumerer les
+# sous-repertoires connus laisserait passer un `data/interim/` ou un fichier
+# depose a la racine de `data/` : la couverture doit etre explicite, pas un
+# effet de bord de la structure actuelle.
+# Le dataset brut fait 639 Mo et les fichiers derives sont integralement
+# reproductibles par `python -m src.data_prep`.
+data/
+
+# --- secrets ---------------------------------------------------------------
+# `.env` seul ne couvre pas `.env.local`, `.env.production`, `.env.staging`.
+# On exclut toutes les variantes et on re-inclut le seul modele partageable.
+.env
+.env.*
+!.env.example
+
+# --- environnement ---------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# --- notebooks -------------------------------------------------------------
+.ipynb_checkpoints/
+
+# --- python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- resultats intermediaires ----------------------------------------------
+# scratch/ ne contient que des sous-produits regenerables (csv, npz, json de
+# travail) deposes par les scripts de tools/. Aucune source n'y vit : les
+# generateurs de livrables sont dans tools/ et sont versionnes, sans quoi ni le
+# notebook ni les rapports ne seraient reproductibles sur un clone.
+scratch/
+
+# tools/ et tests/ sont versionnes :
+#   tools/ = source de verite du notebook et des rapports chiffres
+#   tests/ = seul code qui prouve que les garde-fous echouent quand ils doivent
+
+# --- reglages locaux de l'editeur ------------------------------------------
+# settings.local.json est par convention le fichier de preferences PERSONNELLES
+# (chemins machine, nom d'utilisateur) : il ne se partage pas. Un
+# .claude/settings.json de projet, lui, serait versionne.
+.claude/settings.local.json
+
+# --- systeme ---------------------------------------------------------------
+.DS_Store
+Thumbs.db

@@ -1,0 +1,41 @@
+# Projet ZenAssist — dependances epinglees
+#
+# INTERPRETEUR DE REFERENCE : le .venv du projet, Python 3.13.5.
+# Ces versions sont celles de CET environnement, pas d'une installation systeme
+# (anaconda ou autre). Un requirements.txt epingle sur le mauvais interpreteur
+# donne un projet qui ne s'installe pas ailleurs.
+#
+#     python3.13 -m venv .venv
+#     source .venv/bin/activate
+#     pip install -r requirements.txt
+#
+# Verifie : le pipeline produit des fichiers byte-identiques sous pandas 3.0.5
+# et sous pandas 2.2.3 (memes empreintes sha256), et les 39 verifications de
+# scratch/test_phase3.py passent sur les deux. Les versions ci-dessous sont
+# celles de l'environnement de livraison.
+
+# --- traitement de donnees --------------------------------------------------
+pandas==3.0.5
+numpy==2.5.2
+
+# --- machine learning classique (etape 3) -----------------------------------
+scikit-learn==1.9.0
+scipy==1.18.0
+joblib==1.5.3
+threadpoolctl==3.6.0
+
+# --- visualisation ----------------------------------------------------------
+matplotlib==3.11.1
+seaborn==0.13.2
+
+# --- notebook ---------------------------------------------------------------
+jupyterlab==4.6.3
+ipykernel==7.3.0
+nbformat==5.11.0
+nbclient==0.11.0
+
+# --- etape 2 : approche LLM -------------------------------------------------
+# A decommenter au demarrage de l'etape 2. Non installe a l'etape 1 : le
+# diagnostic et le pipeline de preparation n'appellent aucune API.
+# mistralai==1.5.0
+# python-dotenv==1.0.1
