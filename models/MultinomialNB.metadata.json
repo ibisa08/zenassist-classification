@@ -1,0 +1,106 @@
+{
+  "modele": "MultinomialNB",
+  "genere_le": "2026-08-19",
+  "genere_par": "tools/export_modele.py",
+  "avertissement": "Les scores ci-dessous proviennent d'une validation croisee sur le TRAIN. Ils ne sont comparables a aucun chiffre de l'etape 2 : donnees, ponderation et role differents.",
+  "vectoriseur": {
+    "lowercase": true,
+    "sublinear_tf": true,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "min_df": 2
+  },
+  "classifieur": {
+    "classe": "MultinomialNB",
+    "parametres": {
+      "alpha": 1.0,
+      "class_prior": null,
+      "fit_prior": true,
+      "force_alpha": true
+    },
+    "rebalancement": "sample_weight='balanced'"
+  },
+  "vocabulaire": {
+    "taille": 1235192,
+    "classes": [
+      "Bank account or service",
+      "Credit card or prepaid card",
+      "Credit reporting",
+      "Debt collection",
+      "Money transfer or virtual currency",
+      "Mortgage",
+      "Payday, title or personal loan",
+      "Student loan",
+      "Vehicle loan or lease"
+    ],
+    "n_classes": 9,
+    "referentiel_complet": true
+  },
+  "donnees": {
+    "fichier": "data/processed/train.csv",
+    "lignes_utilisees": 283449,
+    "sha256": "eeaf757019362752104c97be5b55286a90f2ef48608070c2112803b1e15ba458"
+  },
+  "empreintes": {
+    "contenu": "1496654a193dc2013799edc21bc8fcfdda33dfcc87e99ac3bc360e53f2e700ba",
+    "sha256_pickle": "5aa422e4cf97e7867378090a18613ef4888bd30321909b40a53fc74de7514dc2"
+  },
+  "scores": {
+    "cv_f1_macro_train": 0.718,
+    "scores_par_pli": [
+      0.71874,
+      0.719384,
+      0.719794,
+      0.715916,
+      0.716151
+    ],
+    "ecart_apparie_au_meilleur": {
+      "meilleur": "LinearSVC",
+      "ecart": -0.09649,
+      "sd_apparie": 0.00309,
+      "t": -69.72,
+      "t_corrige_nadeau_bengio": -46.48
+    },
+    "sonde_stabilite_vectoriseur_§7": {
+      "verdict": "CAS 2",
+      "meilleur_vectoriseur": "(1,2) min_df=20",
+      "gain_sur_vectoriseur_retenu": 0.01036,
+      "points": {
+        "retenu (1,2) min_df=2": 0.718,
+        "(1,2) min_df=20": 0.72836,
+        "(1,1) min_df=5": 0.72001,
+        "(1,2) min_df=2 sublinear=Off": 0.71988
+      }
+    },
+    "sensibilite_alpha_§9": {
+      "condition": "alpha=1 conserve quel que soit le resultat (caracterisation, pas reglage)",
+      "meilleur_alpha": 0.1,
+      "delta_sur_alpha_1": 0.04164,
+      "verdict": "ancrage intra-famille ML declare CONTAMINE (seuil 0,022)",
+      "points": {
+        "0.001": 0.72709,
+        "0.01": 0.75526,
+        "0.1": 0.75964,
+        "1": 0.718,
+        "10": 0.68537
+      }
+    },
+    "latence_prediction_unitaire": {
+      "p50_ms": 9.93,
+      "p95_ms": 11.48,
+      "fit_s": 32,
+      "conditions": "pipeline complet, 1 reclamation a la fois, 500 mesures via metrics.Timer, 50 prechauffages",
+      "note": "cout domine par une recopie de feature_log_prob_.T (non C-contigu) a chaque appel : artefact d'implementation, pas propriete de l'algorithme. Voir reports/resultats_phaseB.md §4. CHIFFRE DATE : mesure du 2026-08-19 avec scikit-learn 1.6.1 / scipy 1.15.3 / numpy 2.1.3 / Python 3.13.5. Une version future corrigeant la disposition memoire changerait ce chiffre sans que l'algorithme change. Ne pas citer sans sa version."
+    }
+  },
+  "environnement": {
+    "python": "3.13.5",
+    "scikit_learn": "1.6.1",
+    "numpy": "2.1.3",
+    "scipy": "1.15.3",
+    "pandas": "2.2.3",
+    "plateforme": "Darwin"
+  }
+}

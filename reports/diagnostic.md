@@ -979,3 +979,88 @@ conclusion est inchangée.
   une mesure réelle issue des champs `usage`.
 - Les projections de coût du §9.3 du notebook devront être régénérées une fois
   cette constante mise à jour.
+
+---
+
+## Errata n° 2 — 2026-08-19 (étape 3, phase 1)
+
+Même règle que l'errata précédent : **le corps du document n'est pas réécrit.**
+Deux affirmations du **§G.3** sont maintenant mesurées fausses.
+
+### Ce que le §G.3 affirmait
+
+> « Le token `xxxx` sera présent dans 85 % des documents. Son **IDF sera donc
+> quasi nul** (log(N/df) ≈ 0,16), et TF-IDF le neutralisera **automatiquement**. »
+>
+> « Filet de sécurité : `max_df=0.9` dans le `TfidfVectorizer` l'élimine
+> explicitement. »
+
+### Ce que la mesure donne
+
+Mesuré sur les 283 449 lignes du train, `TfidfVectorizer(min_df=5,
+ngram_range=(1,2))`, vocabulaire de 550 116 termes.
+
+| affirmation | mesure | statut |
+|---|---|---|
+| `xxxx` dans 85 % des documents | **84,32 %** | **exacte** |
+| IDF ≈ 0,16 | **1,1706** | **fausse — facteur 7** |
+| `max_df=0.9` élimine `xxxx` | écarte **un seul token, `to`** | **fausse** |
+
+**Sur l'IDF.** Le §G.3 applique la formule manuelle `log(N/df) = log(1/0,843) =
+0,171`. `TfidfVectorizer` utilise `smooth_idf=True` **par défaut**, soit
+`ln((1+N)/(1+df)) + 1`. La valeur réelle est donc **1,1706**.
+
+**Sur le filet de sécurité.** `max_df=0.9` écarte les termes présents dans plus
+de 90 % des documents. Or `xxxx` est à 84,32 %, **rang 5 sur 550 116** — derrière
+`to` (90,84 %), `the` (88,74 %), `and` (89,73 %) et `my`. Un seul token du
+vocabulaire dépasse le seuil : `to`.
+
+L'effet sur la performance est nul, et mesurable :
+
+| configuration | F1-macro (CV train, 3 plis) | vocabulaire | `xxxx` |
+|---|---|---|---|
+| `max_df=1.0` | 0,8095 | 550 116 | présent |
+| `max_df=0.9` — le filet annoncé | **0,8095** | 550 115 | **présent** |
+
+Un token d'écart, F1 identique à la quatrième décimale. Aucun test n'est requis
+ici : les deux vocabulaires diffèrent d'un seul terme sur 550 116, et le score
+est identique — il n'y a pas d'effet à mesurer.
+
+> **Note de lecture, ajoutée après coup.** Une première version de cet errata
+> affichait un « ± 0,0030 » à côté de ces deux valeurs. C'était l'écart-type
+> **entre plis** d'une configuration isolée, et le placer à côté d'une
+> comparaison **entre configurations** invite à l'erreur : les configurations
+> partagent exactement les mêmes plis, donc une grande part de ce bruit leur est
+> commune et s'annule dans la différence. La grandeur pertinente est l'écart-type
+> des **écarts appariés**, pli par pli, qui vaut ici 0,0002 à 0,0009 selon la
+> configuration — soit 4 à 18 fois moins. Mention retirée du tableau.
+
+### Ce qui tient dans le §G.3
+
+**Le mécanisme qualitatif est juste.** `xxxx` se retrouve bien au niveau des mots
+vides : son IDF de 1,1706 le place entre `the` (1,1195) et `and` (1,1084). La
+description du phénomène est correcte. **Ce sont la quantification et le remède
+proposé qui sont faux**, pas l'analyse.
+
+### Leçon générale — le `+1` de `smooth_idf` n'est pas propre à `xxxx`
+
+C'est un **plancher additif appliqué à TOUT le vocabulaire**. Il borne l'IDF par
+le bas à 1,0 quel que soit le `df`, avec deux conséquences qui dépassent
+largement le cas du masquage :
+
+1. **Aucun token n'est jamais neutralisé, seulement atténué.** Un terme présent
+   dans 100 % des documents garde un IDF de 1,0, pas de 0.
+2. **Les rapports entre termes fréquents et rares sont compressés.** Ici, `xxxx`
+   (1,1706) conserve **23 %** du poids de `xxxxxxxx` (5,0162), présent dans 1,8 %
+   des documents. Sans lissage, il n'en garderait que **4,3 %**.
+
+**Un raisonnement du type « l'IDF s'en occupera » est donc structurellement trop
+optimiste avec les réglages par défaut de scikit-learn — pour n'importe quel
+terme fréquent, pas seulement pour le masquage.** Si la neutralisation d'un terme
+est un objectif, elle doit être obtenue explicitement (`stop_words`, `max_df`
+calibré sur la distribution réelle des `df`) et **vérifiée**, jamais déduite du
+mécanisme de l'IDF.
+
+Ce constat rejoint la leçon de méthode de `etape2_synthese.md` §10 : une
+hypothèse structurelle non nommée — ici, la formule d'IDF supposée — n'est
+contestée par personne tant qu'aucun paramètre ne l'exprime.

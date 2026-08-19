@@ -1,0 +1,268 @@
+{
+  "_avertissement": "Tableau 1 : 2 000 lignes PONDEREES Horvitz-Thompson — SEULE comparaison valide avec le LLM. Tableau 2 : test complet NON pondere — ne se compare PAS au LLM, il montre ce que le volume d'entrainement apporte au ML.",
+  "tableau1_2000_pondere": {
+    "LinearSVC": {
+      "n": 2000,
+      "accuracy": 0.8668494445,
+      "F1-macro": 0.8187435068,
+      "F1-weighted": 0.8664741265,
+      "precision macro": 0.821929924,
+      "rappel macro": 0.8164510899,
+      "F1-macro IC 95 %": "[0.798 ; 0.839]",
+      "latence p50 (s)": 0.0002311455,
+      "latence p95 (s)": 0.0004983506,
+      "latence max (s)": 0.001781333,
+      "F1 · Credit reporting": 0.8881213813,
+      "F1 · Debt collection": 0.8532855358,
+      "F1 · Mortgage": 0.933835862,
+      "F1 · Credit card or prepaid card": 0.8197002767,
+      "F1 · Bank account or service": 0.8517182236,
+      "F1 · Student loan": 0.8797151206,
+      "F1 · Money transfer or virtual currency": 0.8253796006,
+      "F1 · Payday, title or personal loan": 0.6979509429,
+      "F1 · Vehicle loan or lease": 0.618984618,
+      "cout / 1000 pred. ($)": null
+    },
+    "LogisticRegression": {
+      "n": 2000,
+      "accuracy": 0.8546244876,
+      "F1-macro": 0.813560432,
+      "F1-weighted": 0.8550525173,
+      "precision macro": 0.7972042961,
+      "rappel macro": 0.8340229482,
+      "F1-macro IC 95 %": "[0.792 ; 0.835]",
+      "latence p50 (s)": 0.0002267915,
+      "latence p95 (s)": 0.0004834643,
+      "latence max (s)": 0.0018157919,
+      "F1 · Credit reporting": 0.8657730625,
+      "F1 · Debt collection": 0.8337121225,
+      "F1 · Mortgage": 0.9216464555,
+      "F1 · Credit card or prepaid card": 0.8331495867,
+      "F1 · Bank account or service": 0.8569049874,
+      "F1 · Student loan": 0.8830778967,
+      "F1 · Money transfer or virtual currency": 0.800291365,
+      "F1 · Payday, title or personal loan": 0.67744087,
+      "F1 · Vehicle loan or lease": 0.6500475418,
+      "cout / 1000 pred. ($)": null
+    },
+    "MultinomialNB": {
+      "n": 2000,
+      "accuracy": 0.7867245623,
+      "F1-macro": 0.7232771224,
+      "F1-weighted": 0.7939498569,
+      "precision macro": 0.6875828471,
+      "rappel macro": 0.8076640459,
+      "F1-macro IC 95 %": "[0.704 ; 0.744]",
+      "latence p50 (s)": 0.0104106875,
+      "latence p95 (s)": 0.012503089,
+      "latence max (s)": 0.0236503329,
+      "F1 · Credit reporting": 0.8239448177,
+      "F1 · Debt collection": 0.7596787374,
+      "F1 · Mortgage": 0.8908794769,
+      "F1 · Credit card or prepaid card": 0.7529678344,
+      "F1 · Bank account or service": 0.8054604808,
+      "F1 · Student loan": 0.7994160482,
+      "F1 · Money transfer or virtual currency": 0.7075153603,
+      "F1 · Payday, title or personal loan": 0.5741511565,
+      "F1 · Vehicle loan or lease": 0.3954801894,
+      "cout / 1000 pred. ($)": null
+    },
+    "mistral-small (LLM)": {
+      "n": 2000,
+      "accuracy": 0.8149014012,
+      "F1-macro": 0.7884872673,
+      "F1-weighted": 0.817137376,
+      "precision macro": 0.8084277449,
+      "rappel macro": 0.7820840356,
+      "F1-macro IC 95 %": "[0.766 ; 0.810]",
+      "latence p50 (s)": 0.470165958,
+      "latence p95 (s)": 0.7403709976,
+      "latence max (s)": 16.826737084,
+      "F1 · Credit reporting": 0.8175345234,
+      "F1 · Debt collection": 0.7708233156,
+      "F1 · Mortgage": 0.9341739539,
+      "F1 · Credit card or prepaid card": 0.7959180028,
+      "F1 · Bank account or service": 0.8111931698,
+      "F1 · Student loan": 0.8531667738,
+      "F1 · Money transfer or virtual currency": 0.7315187094,
+      "F1 · Payday, title or personal loan": 0.696646626,
+      "F1 · Vehicle loan or lease": 0.6854103312,
+      "cout / 1000 pred. ($)": 0.051625935
+    }
+  },
+  "latences_2000": {
+    "LinearSVC": {
+      "latence_n": 2000,
+      "latence_moyenne_s": 0.00026598795072641223,
+      "latence_p50_s": 0.00023114547366276383,
+      "latence_p95_s": 0.0004983505757991223,
+      "latence_max_s": 0.0017813330050557852
+    },
+    "LogisticRegression": {
+      "latence_n": 2000,
+      "latence_moyenne_s": 0.00026093601144384595,
+      "latence_p50_s": 0.00022679148241877556,
+      "latence_p95_s": 0.00048346429248340427,
+      "latence_max_s": 0.0018157919403165579
+    },
+    "MultinomialNB": {
+      "latence_n": 2000,
+      "latence_moyenne_s": 0.01063719540584134,
+      "latence_p50_s": 0.010410687478724867,
+      "latence_p95_s": 0.01250308901653625,
+      "latence_max_s": 0.02365033293608576
+    }
+  },
+  "tableau2_test_complet_non_pondere": {
+    "n": 70863,
+    "f1_macro": 0.8192847674418321,
+    "accuracy": 0.874659554351354,
+    "f1_weighted": 0.8745221531010243,
+    "avertissement": "NON PONDERE, NE SE COMPARE PAS AU LLM"
+  },
+  "mcnemar_linearsvc_vs_mistral_small": {
+    "n_paires": 2000,
+    "b_LinearSVC": 196,
+    "c_mistral-small": 100,
+    "b": 196,
+    "c": 100,
+    "n_discordantes": 296,
+    "accord": 1704,
+    "p_valeur": 2.5560758859813998e-08,
+    "significatif_5pct": true,
+    "sens": "LinearSVC"
+  },
+  "ecart_f1_apparie": {
+    "ecart": 0.030256239515934036,
+    "ic_bas": 0.007145377166329583,
+    "ic_haut": 0.05250572413634714,
+    "n_boot": 1000,
+    "plan": "stratifie intra-classe, meme tirage pour les deux"
+  },
+  "analyse_croisee": {
+    "LinearSVC_vs_mistral_small": {
+      "paire": "LinearSVC / mistral-small",
+      "n_lignes": 1981,
+      "n_parse_error_exclus": 19,
+      "erreurs_LinearSVC": 282,
+      "erreurs_mistral-small": 366,
+      "taux_erreur_a": 0.14235234729934376,
+      "taux_erreur_b": 0.18475517415446743,
+      "attendu_sous_independance": 52.10095911155982,
+      "co_echec": 182,
+      "co_echec_oriente": 144,
+      "part_orientee": 0.7912087912087912,
+      "lift": 3.493217842886486,
+      "jaccard": 0.3905579399141631,
+      "R": 1.0950526153249172,
+      "concentration": {
+        "communes": 0.37362637362637363,
+        "n_communes": 182,
+        "propres_a": 0.46,
+        "n_propres_a": 100,
+        "propres_b": 0.5869565217391305,
+        "n_propres_b": 184,
+        "propres_moyenne": 0.5234782608695653,
+        "ecart_points": -14.985188724319165
+      },
+      "rattrapage_3_classes": {
+        "numerateur": 80,
+        "denominateur": 157,
+        "taux": 0.5095541401273885
+      }
+    },
+    "LogisticRegression_vs_mistral_small": {
+      "paire": "LogisticRegression / mistral-small",
+      "n_lignes": 1981,
+      "n_parse_error_exclus": 19,
+      "erreurs_LogisticRegression": 294,
+      "erreurs_mistral-small": 366,
+      "taux_erreur_a": 0.14840989399293286,
+      "taux_erreur_b": 0.18475517415446743,
+      "attendu_sous_independance": 54.31802120141342,
+      "co_echec": 209,
+      "co_echec_oriente": 170,
+      "part_orientee": 0.8133971291866029,
+      "lift": 3.8477101223002865,
+      "jaccard": 0.4634146341463415,
+      "R": 1.2061787217242277,
+      "concentration": {
+        "communes": 0.41148325358851673,
+        "n_communes": 209,
+        "propres_a": 0.5058823529411764,
+        "n_propres_a": 85,
+        "propres_b": 0.5668789808917197,
+        "n_propres_b": 157,
+        "propres_moyenne": 0.5363806669164481,
+        "ecart_points": -12.489741332793141
+      },
+      "rattrapage_3_classes": {
+        "numerateur": 67,
+        "denominateur": 157,
+        "taux": 0.4267515923566879
+      }
+    },
+    "MultinomialNB_vs_mistral_small": {
+      "paire": "MultinomialNB / mistral-small",
+      "n_lignes": 1981,
+      "n_parse_error_exclus": 19,
+      "erreurs_MultinomialNB": 411,
+      "erreurs_mistral-small": 366,
+      "taux_erreur_a": 0.20747097425542654,
+      "taux_erreur_b": 0.18475517415446743,
+      "attendu_sous_independance": 75.93437657748612,
+      "co_echec": 221,
+      "co_echec_oriente": 159,
+      "part_orientee": 0.7194570135746606,
+      "lift": 2.9104077752516186,
+      "jaccard": 0.39748201438848924,
+      "R": 0.9123535345616359,
+      "concentration": {
+        "communes": 0.40271493212669685,
+        "n_communes": 221,
+        "propres_a": 0.3631578947368421,
+        "n_propres_a": 190,
+        "propres_b": 0.5655172413793104,
+        "n_propres_b": 145,
+        "propres_moyenne": 0.46433756805807624,
+        "ecart_points": -6.16226359313794
+      },
+      "rattrapage_3_classes": {
+        "numerateur": 55,
+        "denominateur": 157,
+        "taux": 0.3503184713375796
+      }
+    },
+    "CONTAMINE_LogReg_vs_NB": {
+      "paire": "LogisticRegression / MultinomialNB",
+      "n_lignes": 2000,
+      "n_parse_error_exclus": 0,
+      "erreurs_LogisticRegression": 300,
+      "erreurs_MultinomialNB": 417,
+      "taux_erreur_a": 0.15,
+      "taux_erreur_b": 0.2085,
+      "attendu_sous_independance": 62.55,
+      "co_echec": 243,
+      "co_echec_oriente": 203,
+      "part_orientee": 0.8353909465020576,
+      "lift": 3.8848920863309355,
+      "jaccard": 0.5126582278481012,
+      "R": 1.21783450982161,
+      "concentration": {
+        "communes": 0.4691358024691358,
+        "n_communes": 243,
+        "propres_a": 0.3157894736842105,
+        "n_propres_a": 57,
+        "propres_b": 0.3045977011494253,
+        "n_propres_b": 174,
+        "propres_moyenne": 0.3101935874168179,
+        "ecart_points": 15.894221505231787
+      },
+      "rattrapage_3_classes": {
+        "numerateur": 75,
+        "denominateur": 169,
+        "taux": 0.4437869822485207
+      }
+    }
+  }
+}

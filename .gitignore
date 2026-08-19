@@ -42,6 +42,21 @@ scratch/
 #   tools/ = source de verite du notebook et des rapports chiffres
 #   tests/ = seul code qui prouve que les garde-fous echouent quand ils doivent
 
+# --- modeles ---------------------------------------------------------------
+# Les pickles font ~90 Mo (9 classes x 1,24 M coefficients) et sont exclus au
+# meme motif que data/ : ils sont reproductibles. Ce motif n'est pas une
+# affirmation. `tools/export_modele.py` est deterministe et
+# `tests/test_export_modele.py` le verifie -- deux ajustements, dans deux
+# processus distincts, doivent donner la meme empreinte de contenu. Si ce test
+# tombe, la ligne ci-dessous n'est plus justifiee.
+#
+# Le fichier de metadonnees, lui, EST versionne : il dit ce qu'un pickle
+# contient sans qu'on ait a le charger (vectoriseur, classifieur et parametres,
+# taille du vocabulaire, empreintes, scores, versions, date), et c'est lui qui
+# permet de verifier un artefact telecharge depuis une release.
+models/*
+!models/*.metadata.json
+
 # --- reglages locaux de l'editeur ------------------------------------------
 # settings.local.json est par convention le fichier de preferences PERSONNELLES
 # (chemins machine, nom d'utilisateur) : il ne se partage pas. Un
