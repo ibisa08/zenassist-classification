@@ -935,3 +935,47 @@ pour alléger le code.
 ---
 
 *Fin du diagnostic — phase 2. Aucun module ni notebook produit à ce stade.*
+
+---
+
+## Errata — 2026-08-19
+
+**Ce document n'est pas réécrit.** Il porte les chiffres connus à sa date de
+rédaction, et c'est ce qui lui donne sa valeur d'archive : un livrable
+réactualisé en continu n'aurait plus de date de validité, et on ne saurait plus
+sur quelles données les arbitrages de l'étape 1 ont été pris.
+
+Une seule valeur y est aujourd'hui **périmée**, signalée ici pour qu'aucun
+lecteur ne la reprenne :
+
+### §D.3 — tarif de `mistral-small-latest`
+
+Le corps du document indique **0,10 $ / M tokens en entrée et 0,30 $ / M en
+sortie**. C'était l'hypothèse de travail retenue avant tout relevé, et elle est
+**fausse**.
+
+Relevé le 2026-08-19 sur deux sources concordantes (`mistral.ai/pricing/api` et
+`docs.mistral.ai/inference/pricing`), l'alias `mistral-small-latest` pointe sur
+**Mistral Small 4** (`mistral-small-2603`), facturé **0,15 $ / M en entrée et
+0,60 $ / M en sortie** — soit un facteur 1,5 en entrée et 2 en sortie.
+
+**Source unique de vérité : `MODELS_PRICING` dans `src/config.py`**, dont la
+date de relevé est portée par `PRICING_CHECKED_ON`. Aucun tarif ne doit être
+repris depuis ce rapport, ni depuis aucun autre fichier.
+
+### Conséquence sur les conclusions de l'étape 1
+
+**Aucune.** Le §D.3 conclut que le coût n'est pas le facteur discriminant du
+projet : l'écart entre le modèle le moins cher et le plus cher du catalogue
+couvre deux ordres de grandeur tout en restant négligeable devant le coût du
+traitement manuel. Un facteur 1,5 à 2 sur un seul modèle ne déplace pas cet
+arbitrage. C'est la **latence** qui contraint réellement l'approche LLM, et cette
+conclusion est inchangée.
+
+### Autres chiffres à revérifier avant toute restitution client
+
+- `AVG_COMPLAINT_TOKENS = 257` reste une **hypothèse non vérifiée** à cette date
+  (mots × 1,3, jamais confrontée au tokenizer Mistral). L'étape 2 la remplace par
+  une mesure réelle issue des champs `usage`.
+- Les projections de coût du §9.3 du notebook devront être régénérées une fois
+  cette constante mise à jour.

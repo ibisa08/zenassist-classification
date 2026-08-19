@@ -270,15 +270,24 @@ def main() -> int:
     check("evaluate integre les latences", "latence_p95_s" in res_lat)
 
     # --- cout ---------------------------------------------------------------
+    # Le cout attendu est DERIVE de config, jamais recopie : une valeur en dur
+    # ferait de ce test une seconde source de verite, qui se perimerait des la
+    # prochaine mesure. Les tokens ont ete mis a jour le 2026-08-19 (257 -> 245,
+    # prefixe 260 -> 252) et cette assertion a suivi sans etre retouchee.
+    tarif = cfg.MODELS_PRICING[cfg.DEFAULT_MODEL]
+    tok_in = (cfg.AVG_COMPLAINT_TOKENS + cfg.PROMPT_INSTRUCTION_TOKENS
+              + cfg.PROMPT_LABELS_TOKENS)
+    attendu_1000 = (tok_in * tarif["input_per_1m"]
+                    + cfg.AVG_OUTPUT_TOKENS * tarif["output_per_1m"]) / 1e6 * 1000
     cout = mt.estimate_cost(1000)
     check("estimate_cost defaut = mistral-small-4 a 0,15/0,60",
           cout["model"] == "mistral-small-4" and cout["input_per_1m"] == 0.15
-          and abs(cout["cout_total_usd"] - 0.0824) < 0.001,
-          f"{cout['cout_total_usd']:.4f} $ / 1000 pred., "
-          f"{cout['cout_annuel_usd']:.1f} $ par an")
+          and abs(cout["cout_total_usd"] - attendu_1000) < 1e-6,
+          f"{cout['cout_total_usd']:.4f} $ / 1000 pred. (attendu "
+          f"{attendu_1000:.4f}), {cout['cout_annuel_usd']:.1f} $ par an")
     cout_test = mt.estimate_cost(70863)
-    check("cout du test complet ~5,8 $",
-          abs(cout_test["cout_total_usd"] - 5.84) < 0.15,
+    check("cout du test complet coherent avec le cout unitaire",
+          abs(cout_test["cout_total_usd"] - attendu_1000 / 1000 * 70863) < 0.01,
           f"{cout_test['cout_total_usd']:.2f} $")
 
     # le cache de prefixe est le levier principal
@@ -319,11 +328,26 @@ def main() -> int:
     check("le tableau est trie du moins cher au plus cher",
           tab_cout.index[0] == "ministral-3b" and tab_cout.index[-1] == "gpt-5.6-sol",
           f"{tab_cout.index[0]} -> {tab_cout.index[-1]}")
-    check("fourchette annuelle sans cache ~19 $ a ~1 031 $",
-          abs(tab_cout["$/an sans cache"].iloc[0] - 19.16) < 1
-          and abs(tab_cout["$/an sans cache"].iloc[-1] - 1031) < 5,
-          f"{tab_cout['$/an sans cache'].iloc[0]:.0f} $ -> "
-          f"{tab_cout['$/an sans cache'].iloc[-1]:.0f} $")
+    # Bornes DERIVEES des tarifs et des volumes de config, pas recopiees : ce
+    # sont les memes chiffres qui ont bouge le 2026-08-19 avec la mesure des
+    # tokens. Ce qui est verifie ici est l'ECART entre le moins cher et le plus
+    # cher du catalogue -- deux ordres de grandeur -- pas sa valeur absolue.
+    def _annuel(cle):
+        t = cfg.MODELS_PRICING[cle]
+        tok = (cfg.AVG_COMPLAINT_TOKENS + cfg.PROMPT_INSTRUCTION_TOKENS
+               + cfg.PROMPT_LABELS_TOKENS)
+        return ((tok * t["input_per_1m"] + cfg.AVG_OUTPUT_TOKENS
+                 * t["output_per_1m"]) / 1e6 * cfg.DAILY_COMPLAINTS * 365)
+
+    moins_cher = min(cfg.MODELS_PRICING, key=_annuel)
+    plus_cher = max(cfg.MODELS_PRICING, key=_annuel)
+    check("fourchette annuelle sans cache : deux ordres de grandeur",
+          abs(tab_cout["$/an sans cache"].iloc[0] - _annuel(moins_cher)) < 1
+          and abs(tab_cout["$/an sans cache"].iloc[-1] - _annuel(plus_cher)) < 5
+          and _annuel(plus_cher) / _annuel(moins_cher) > 40,
+          f"{tab_cout['$/an sans cache'].iloc[0]:.0f} $ ({moins_cher}) -> "
+          f"{tab_cout['$/an sans cache'].iloc[-1]:.0f} $ ({plus_cher}), "
+          f"rapport x{_annuel(plus_cher) / _annuel(moins_cher):.0f}")
 
     try:
         mt.estimate_cost(1000, "modele-inexistant")

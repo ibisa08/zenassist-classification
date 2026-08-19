@@ -1,7 +1,20 @@
 """Metriques partagees par l'etape 2 (LLM) et l'etape 3 (ML classique).
 
-Ce module est FIGE une fois valide : les deux approches doivent etre mesurees
-avec exactement le meme code, sinon la comparaison finale ne vaut rien.
+============================================================================
+REGLE DE GEL
+----------------------------------------------------------------------------
+Ce module est gele depuis la validation de l'etape 1. Seules les modifications
+SANS effet sur une valeur calculee sont autorisees (docstrings, commentaires,
+annotations de type). Toute autre modification exige une revalidation croisee
+des etapes 2 et 3.
+
+Cette regle est OPPOSABLE : `tests/test_metrics_gel.py` rejoue un jeu fige et
+compare les sorties a des valeurs de reference. Une modification de logique
+deguisee en correction de commentaire y echoue immediatement.
+============================================================================
+
+Les deux approches doivent etre mesurees avec exactement le meme code, sinon la
+comparaison finale ne vaut rien.
 
 METRIQUE PRINCIPALE : F1-macro
 ------------------------------
@@ -355,7 +368,10 @@ def estimate_cost(
     n_predictions : nombre de reclamations a classer.
     model : cle de `config.MODELS_PRICING`. Defaut `config.DEFAULT_MODEL`.
     avg_tokens : tokens d'entree moyens par appel, HORS surcout de prompt. Par
-        defaut la moyenne estimee sur le corpus (257 tokens).
+        defaut `config.AVG_COMPLAINT_TOKENS`. Aucun chiffre n'est recopie ici :
+        cette valeur est passee de 257 (hypothese mots x 1,3) a 245 (mesure du
+        2026-08-19 sur le tokenizer Mistral), et une docstring portant le nombre
+        en dur aurait menti des ce jour-la.
     prompt_overhead_tokens : instruction + liste des 9 etiquettes. Par defaut
         260 tokens (200 + 60), hypothese documentee dans le diagnostic D.3.
     cached_prefix_tokens : nombre de tokens du prefixe constant servi depuis le

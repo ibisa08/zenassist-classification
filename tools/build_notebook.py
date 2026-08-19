@@ -12,6 +12,7 @@ Le notebook etant remis au client, ses SORTIES ne doivent contenir ni chemin
 absolu ni nom d'utilisateur : un .ipynb conserve ce qu'il affiche.
 """
 
+import sys
 from pathlib import Path
 
 import nbformat as nbf
@@ -23,6 +24,13 @@ RACINE = Path(__file__).resolve().parent
 while not (RACINE / "src" / "config.py").exists() and RACINE != RACINE.parent:
     RACINE = RACINE.parent
 DEST = RACINE / "notebooks" / "01_exploration.ipynb"
+
+# Le generateur lui-meme a besoin de `config` pour DERIVER les chiffres de la
+# prose (§9.3) au lieu de les recopier a la main. Sans cela, un texte comme
+# "-42,6 %" reste fige alors que la constante qui le produit a change -- c'est
+# exactement ce qui s'est produit entre l'etape 1 et la mesure du 2026-08-19.
+sys.path.insert(0, str(RACINE))
+from src import config as cfg  # noqa: E402
 cellules = []
 
 
@@ -73,6 +81,8 @@ sections : [`reports/diagnostic.md`](../reports/diagnostic.md),
 > sensiblement plus lentes que les autres et sont signalées à l'endroit où elles
 > apparaissent (chargement du fichier brut, puis nettoyage).
 """)
+
+
 
 # --------------------------------------------------------------------------
 md(r"""
@@ -1103,22 +1113,67 @@ tableau_cout = mt.compare_models_cost(cfg.LLM_EVAL_SAMPLE_SIZE)
 tableau_cout
 """)
 
+# --- valeurs derivees pour la prose du §9.3 (jamais recopiees a la main) ---
+def _annuel_modele(cle):
+    t = cfg.MODELS_PRICING[cle]
+    tok = (cfg.AVG_COMPLAINT_TOKENS + cfg.PROMPT_INSTRUCTION_TOKENS
+           + cfg.PROMPT_LABELS_TOKENS)
+    return ((tok * t["input_per_1m"] + cfg.AVG_OUTPUT_TOKENS * t["output_per_1m"])
+            / 1e6 * cfg.DAILY_COMPLAINTS * 365)
+
+_annuel_min = min(_annuel_modele(k) for k in cfg.MODELS_PRICING)
+_annuel_max = max(_annuel_modele(k) for k in cfg.MODELS_PRICING)
+_annuel_max_fmt = f"{_annuel_max:,.0f}".replace(",", " ")
+_obs = cfg.CACHE_MESURE[cfg.DEFAULT_MODEL]
+_pref = cfg.CACHED_PREFIX_TOKENS_PAR_MODELE[cfg.DEFAULT_MODEL]
+_tok_total = cfg.AVG_COMPLAINT_TOKENS + _pref
+_couv = _pref * _obs["couverture_prefixe"]
+_act = _obs["taux_activation"]
+_act_froid = _obs["taux_activation_demarrage"]
+_tarif = cfg.MODELS_PRICING[cfg.DEFAULT_MODEL]
+
+def _cout_1000(caches):
+    return ((_tok_total - caches) * _tarif["input_per_1m"]
+            + caches * _tarif["input_per_1m"] * 0.1
+            + cfg.AVG_OUTPUT_TOKENS * _tarif["output_per_1m"]) / 1e6 * 1000
+
+_base = _cout_1000(0)
+_eco_froid = 1 - _cout_1000(_pref * _obs["couverture_prefixe"] * _act_froid) / _base
+_eco_mesure = 1 - _cout_1000(_couv * _act) / _base
+_eco_theo = 1 - _cout_1000(_pref) / _base
+
 code(r"""
-defaut = mt.estimate_cost(1000)
-avec_cache = mt.estimate_cost(1000, cached_prefix_tokens=cfg.CACHED_PREFIX_TOKENS)
-campagne = mt.estimate_cost(cfg.LLM_EVAL_SAMPLE_SIZE,
-                            cached_prefix_tokens=cfg.CACHED_PREFIX_TOKENS)
-complet = mt.estimate_cost(len(test), cached_prefix_tokens=cfg.CACHED_PREFIX_TOKENS)
+# Trois regimes de cache. Le parametre `cached_prefix_tokens` de estimate_cost
+# recoit le nombre MOYEN de tokens caches par appel, soit
+#     prefixe x couverture x taux d'activation.
+obs = cfg.CACHE_MESURE[cfg.DEFAULT_MODEL]
+pref = cfg.CACHED_PREFIX_TOKENS_PAR_MODELE[cfg.DEFAULT_MODEL]
+
+defaut  = mt.estimate_cost(1000)
+theorique = mt.estimate_cost(1000, cached_prefix_tokens=pref)
+mesure  = mt.estimate_cost(
+    1000, cached_prefix_tokens=pref * obs["couverture_prefixe"] * obs["taux_activation"])
+campagne = mt.estimate_cost(
+    cfg.LLM_EVAL_SAMPLE_SIZE,
+    cached_prefix_tokens=pref * obs["couverture_prefixe"] * obs["taux_activation"])
+complet = mt.estimate_cost(
+    len(test),
+    cached_prefix_tokens=pref * obs["couverture_prefixe"] * obs["taux_activation"])
 
 print(f"MODELE PAR DEFAUT : {defaut['model']} ({defaut['fournisseur']}) — "
-      f"{defaut['input_per_1m']} / {defaut['output_per_1m']} $ par M de tokens\n")
-print(f"  1 000 predictions, sans cache : {defaut['cout_total_usd']:.4f} $"
-      f"   -> {defaut['cout_annuel_usd']:>6.1f} $ / an a 1 000 par jour")
-print(f"  1 000 predictions, AVEC cache : {avec_cache['cout_total_usd']:.4f} $"
-      f"   -> {avec_cache['cout_annuel_usd']:>6.1f} $ / an")
-economie = (1 - avec_cache["cout_total_usd"] / defaut["cout_total_usd"]) * 100
-print(f"  economie apportee par le cache de prefixe : {economie:.1f} %\n")
-print(f"  campagne d'evaluation ({cfg.LLM_EVAL_SAMPLE_SIZE:,} appels) : "
+      f"{defaut['input_per_1m']} / {defaut['output_per_1m']} $ par M de tokens")
+print(f"tokens MESURES le {cfg.AVG_COMPLAINT_TOKENS_MESURE_LE} : "
+      f"{cfg.AVG_COMPLAINT_TOKENS} pour le texte + {pref} de prefixe\n")
+
+for nom, r in [("sans cache", defaut),
+               ("cache MESURE (regime etabli)", mesure),
+               ("cache THEORIQUE (borne)", theorique)]:
+    eco = (1 - r["cout_total_usd"] / defaut["cout_total_usd"]) * 100
+    print(f"  1 000 predictions, {nom:30s} : {r['cout_total_usd']:.4f} $"
+          f"   -> {r['cout_annuel_usd']:>6.1f} $ / an"
+          + (f"   ({eco:.1f} %)" if eco else ""))
+
+print(f"\n  campagne d'evaluation ({cfg.LLM_EVAL_SAMPLE_SIZE:,} appels) : "
       f"{campagne['cout_total_usd']:.3f} $")
 print(f"  test complet ({len(test):,} appels)          : "
       f"{complet['cout_total_usd']:.2f} $")
@@ -1127,46 +1182,61 @@ fourchette = tableau_cout["$/an sans cache"]
 print(f"\nfourchette du catalogue, sans cache : {fourchette.min():.0f} $ "
       f"({fourchette.idxmin()}) a {fourchette.max():,.0f} $ ({fourchette.idxmax()}) par an"
       .replace(",", " "))
-print(f"valeurs issues d'HYPOTHESES : {defaut['hypotheses']}   "
-      f"(tarifs verifies le {defaut['tarif_verifie_le']})")
+print(f"volumes de tokens mesures pour : "
+      f"{', '.join(sorted(cfg.FOURNISSEURS_TOKENS_MESURES))} — "
+      f"HYPOTHESE pour les autres fournisseurs (tokenizers differents)")
+print(f"tarifs verifies le {defaut['tarif_verifie_le']}")
 for a in campagne["avertissements"]:
     print("  avertissement :", a)
 """)
 
-md(r"""
+md(f"""
 ### Trois lectures du tableau
 
 **1. Le coût n'est pas le facteur discriminant.** Du moins cher au plus cher, la
-projection annuelle pour 1 000 réclamations quotidiennes va de **19 $** à **1 031 $**.
-Deux ordres de grandeur — et pourtant, même le plus cher reste négligeable devant le
-coût du traitement manuel qu'il remplace. **Conséquence : le modèle peut être choisi sur
-sa qualité et ses contraintes de conformité, pas sur son prix.**
+projection annuelle pour 1 000 réclamations quotidiennes va de **{_annuel_min:.0f} $** à
+**{_annuel_max_fmt} $**. Deux ordres de grandeur — et pourtant, même le
+plus cher reste négligeable devant le coût du traitement manuel qu'il remplace.
+**Conséquence : le modèle peut être choisi sur sa qualité et ses contraintes de
+conformité, pas sur son prix.**
 
-**2. Le cache de préfixe pèse plus lourd que le choix du modèle.** Le prompt aura un
-préfixe constant d'environ 260 tokens (instruction + liste des 9 étiquettes), soit **la
-moitié des 517 tokens d'entrée par appel**. Ce préfixe est éligible au cache chez tous
-les fournisseurs relevés — remise de 90 % chez Mistral, Anthropic et OpenAI, 98 % chez
-DeepSeek qui cache automatiquement.
+**2. Le cache de préfixe pèse plus lourd que le choix du modèle — mais moins que prévu.**
+Le préfixe constant (instruction + liste des 9 étiquettes) **mesuré à {_pref} tokens**
+représente environ la moitié des {_tok_total} tokens d'entrée par appel.
 
-L'effet est net : **−42,6 % sur le modèle par défaut**. Autrement dit, activer le cache
-sur `mistral-small-4` (17 $/an) fait mieux que basculer sur `ministral-3b` sans cache
-(19 $/an), alors que ce dernier est un modèle nettement plus petit. C'est le premier
-levier à actionner à l'étape 2.
+Ce point a été **mesuré à l'étape 2 sur 200 appels réels**, et la mesure corrige une
+projection initiale trop optimiste :
+
+| régime | économie | ce que c'est |
+|---|---|---|
+| démarrage à froid (20 premiers appels) | **{_eco_froid:.0%}** | cache encore vide |
+| **régime établi** (mesuré) | **{_eco_mesure:.0%}** | ce qu'obtient une campagne longue |
+| borne théorique | {_eco_theo:.0%} | plafond, jamais atteint |
+
+Deux effets, tous deux invisibles avant mesure. La **couverture est plafonnée** : le
+cache ne sert jamais que {_couv:.0f} tokens sur les {_pref} du préfixe, une quantification
+structurelle qui ne bouge pas. Et l'**activation dépend du réchauffement** : {_act_froid:.0%}
+sur les 20 premiers appels, {_act:.0%} ensuite.
 
 **3. Ce qui contraint réellement, c'est la latence.** Évaluer sur les 70 863 lignes du
-test coûterait moins de 4 $ — mais prendrait une vingtaine d'heures. C'est cela qui
+test coûterait quelques dollars — mais prendrait une vingtaine d'heures. C'est cela qui
 justifie l'échantillon de 2 000, et c'est ainsi qu'il faut le formuler au client : un
 argument de temps de traitement, pas de budget.
 
-### ⚠️ Deux précautions
+### ⚠️ Trois précautions
 
-- Le flag `hypotheses = True` signale que le nombre de tokens repose sur une
-  **estimation non mesurée** (mots × 1,3). Le champ `usage` des réponses de l'API le
-  remplacera dès la première campagne.
+- **Les volumes de tokens ne sont mesurés que pour Mistral.** Les tokenizers d'Anthropic,
+  OpenAI, Google et DeepSeek diffèrent : pour ces fournisseurs, les colonnes du tableau
+  restent des **hypothèses**. Un flag global unique ferait passer 8 modèles sur 10 pour
+  mesurés.
+- **La colonne « avec cache » du tableau des 10 modèles est la borne théorique**, donc
+  optimiste. Seul Mistral a été mesuré. Le levier `prompt_cache_key`, qui rapprocherait
+  le régime réel de la borne, est documenté dans
+  [`reports/leviers_optimisation.md`](../reports/leviers_optimisation.md) — il a été
+  volontairement écarté de l'évaluation, qui doit mesurer le comportement par défaut.
 - `claude-sonnet-5` bénéficie d'un **tarif d'introduction expirant le 31/08/2026** ;
   le tarif standard (+50 %) s'applique au 01/09. `estimate_cost()` bascule
-  automatiquement et lève un avertissement passé cette date — une projection annuelle
-  bâtie sur le tarif promotionnel serait fausse dès le mois prochain.
+  automatiquement et lève un avertissement passé cette date.
 
 Le détail — sources, volatilité, tier gratuit, API Batch, argument RGPD — est en §4 de
 [`reports/limites.md`](../reports/limites.md).

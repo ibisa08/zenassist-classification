@@ -281,8 +281,32 @@ BOOTSTRAP_ALPHA = 0.05
 #           annonce une hausse le 06/08 sans en preciser ni la date ni le
 #           montant. A reverifier avant toute projection chiffree presentee au
 #           client.
-PRICING_CHECKED_ON = "2026-08-11"
+# Releve le 2026-08-11, RECONFIRME INCHANGE le 2026-08-19 sur deux sources
+# concordantes (mistral.ai/pricing/api et docs.mistral.ai/inference/pricing)
+# pour les deux modeles compares a l'etape 2 :
+#   Mistral Small 4  : 0,15 / 0,60 $ par M de tokens, cache a 0,015 $ (-90 %)
+#   Ministral 3 3B   : 0,10 / 0,10 $ par M de tokens, cache -90 %
+# Controle croise : Mistral Large 3 releve a 0,50 / 1,50 $, conforme.
+PRICING_CHECKED_ON = "2026-08-19"
 
+# ###################################################################
+# CE DICTIONNAIRE EST UNE GRILLE TARIFAIRE, PAS UN REGISTRE
+# D'IDENTIFIANTS D'API. NE JAMAIS PASSER UNE CLE D'ICI A L'API.
+# ###################################################################
+# Constat verifie le 2026-08-19 par `client.models.list()` : AUCUNE des cles
+# ci-dessous n'est un identifiant accepte par l'API Mistral. "mistral-small-4"
+# et "ministral-3b" n'existent pas cote API ; les identifiants reels sont
+# "mistral-small-latest" et "ministral-3b-latest".
+#
+# Les cles sont des noms COMMERCIAUX, choisis pour la lisibilite des tableaux de
+# cout. Les identifiants d'appel vivent dans `LLM_MODELES_A_COMPARER` (section
+# 8), qui porte la correspondance et la version resolue de chaque alias.
+#
+# Sans cette note, quelqu'un finira par ecrire
+# `client.chat.complete(model=cfg.DEFAULT_MODEL)` : l'API repondrait par une
+# 400 sur un nom de modele inconnu, au mieux immediatement, au pire au milieu
+# d'une campagne.
+#
 # Tarifs en DOLLARS PAR MILLION DE TOKENS.
 #
 # `remise_cache` : reduction appliquee a la part d'entree servie depuis le cache
@@ -291,11 +315,17 @@ PRICING_CHECKED_ON = "2026-08-11"
 #     None = non verifie pour ce fournisseur ; le cache n'est alors PAS modelise
 #     plutot que suppose (cf. gemini-3.5-flash).
 # `cache_automatique` : True si le fournisseur cache sans declaration explicite.
+#     VERIFIE le 2026-08-19 pour Mistral : le cache de prefixe s'active seul,
+#     sans parametre d'activation, et `usage.prompt_tokens_details.cached_tokens`
+#     remonte la part servie. Ce champ valait False par erreur jusqu'a cette date.
+#     Un champ documentaire faux est plus dangereux qu'un champ absent : il est
+#     cru sans etre reverifie. `tests/test_llm_config.py` en controle desormais
+#     la coherence pour TOUS les fournisseurs, pas seulement DeepSeek.
 # `tarif_provisoire_jusquau` / `tarif_apres` : tarif promotionnel a duree limitee.
 MODELS_PRICING = {
     "ministral-3b": {
         "fournisseur": "Mistral", "input_per_1m": 0.10, "output_per_1m": 0.10,
-        "remise_cache": 0.90, "cache_automatique": False,
+        "remise_cache": 0.90, "cache_automatique": True,
         "tarif_provisoire_jusquau": None, "tarif_apres": None,
     },
     "deepseek-v4-flash": {
@@ -305,7 +335,7 @@ MODELS_PRICING = {
     },
     "mistral-small-4": {
         "fournisseur": "Mistral", "input_per_1m": 0.15, "output_per_1m": 0.60,
-        "remise_cache": 0.90, "cache_automatique": False,
+        "remise_cache": 0.90, "cache_automatique": True,
         "tarif_provisoire_jusquau": None, "tarif_apres": None,
     },
     "gpt-5.6-luna": {
@@ -315,7 +345,7 @@ MODELS_PRICING = {
     },
     "mistral-large-3": {
         "fournisseur": "Mistral", "input_per_1m": 0.50, "output_per_1m": 1.50,
-        "remise_cache": 0.90, "cache_automatique": False,
+        "remise_cache": 0.90, "cache_automatique": True,
         "tarif_provisoire_jusquau": None, "tarif_apres": None,
     },
     "gemini-3.5-flash": {
@@ -356,7 +386,81 @@ DEFAULT_MODEL = "mistral-small-4"
 # Taille du prefixe constant du prompt, eligible au cache : instruction + liste
 # des 9 etiquettes. C'est le levier de cout le plus important du projet, devant
 # le choix du modele lui-meme.
-CACHED_PREFIX_TOKENS = 260
+#
+# GRANULARITE DU CACHE : 64 TOKENS (docs Mistral, verifie le 2026-08-19).
+# Le cache travaille par blocs de 64 tokens, et un prompt de moins de 64 tokens
+# n'obtient JAMAIS de hit. Deux consequences :
+#   - nos ~260 tokens de prefixe representent 4 blocs pleins : on est
+#     confortablement au-dessus du seuil, le cache peut s'activer ;
+#   - un prefixe raccourci "pour economiser des tokens" serait contre-productif
+#     sous 64 tokens, puisqu'il perdrait la remise de 90 % sur la totalite.
+# La part reellement servie est MESUREE par appel via
+# `usage.prompt_tokens_details.cached_tokens`, jamais estimee depuis cette
+# constante : celle-ci ne sert qu'aux projections faites avant mesure.
+# MESURE le 2026-08-19 : 252 tokens pour mistral-small, 240 pour ministral-3b
+# (ordonnee a l'origine de la regression). L'ecart de 12 tokens entre les deux
+# est reel -- surcout de gabarit de conversation -- d'ou une valeur PAR MODELE.
+# Cette constante globale conserve la valeur du modele par defaut, pour les
+# appelants qui ne precisent pas de modele.
+CACHED_PREFIX_TOKENS = 252
+
+CACHED_PREFIX_TOKENS_PAR_MODELE = {
+    "mistral-small-4": 252,
+    "ministral-3b": 240,
+    # Les autres modeles n'ont PAS ete mesures : leur tokenizer differe et le
+    # gabarit de conversation aussi. Y appliquer 252 serait une extrapolation.
+}
+
+# ---------------------------------------------------------------------------
+# CACHE REELLEMENT OBSERVE  (mesure du 2026-08-19, 40 appels)
+# ---------------------------------------------------------------------------
+# DECOUVERTE DE LA PHASE 2. `metrics.estimate_cost()` modelise implicitement
+# une activation du cache a 100 % et une couverture totale du prefixe. La
+# mesure dit tout autre chose :
+#
+#   - la COUVERTURE est PARTIELLE et CONSTANTE : 224 tokens sur un prefixe de
+#     252 chez mistral-small (89 %), 128 sur 240 chez ministral (53 %). Ce
+#     plafond est structurel et ne bouge jamais.
+#   - l'ACTIVATION depend du RECHAUFFEMENT : 55 % sur les 20 premiers appels
+#     chez mistral-small, ~98 % une fois le prefixe etabli.
+#
+# Consequence : l'economie reelle depend du regime. Sur 20 appels a froid elle
+# n'est que de 20 %, ce qui a d'abord fait croire a une projection optimiste
+# d'un facteur 2. Sur une campagne longue a prefixe constant, elle approche la
+# borne theorique -- mais sans jamais l'atteindre, la couverture plafonnant a
+# 89 % (mistral-small) et 53 % (ministral).
+#
+# La valeur theorique reste le PLAFOND atteignable (avec `prompt_cache_key`,
+# cf. reports/leviers_optimisation.md) : on ne la remplace pas, on affiche les
+# deux bornes cote a cote.
+CACHE_MESURE = {
+    # DEUX REGIMES, mesures sur 5 passes de 20 appels (2026-08-19).
+    #
+    # La COUVERTURE est structurellement CONSTANTE : le cache sert toujours
+    # exactement 224 tokens chez mistral-small et 128 chez ministral, quel que
+    # soit l'appel. C'est une quantification par blocs, pas une variable.
+    #
+    # Seule l'ACTIVATION varie, et elle MONTE avec le nombre d'appels partageant
+    # le prefixe : 55 % sur les 20 premiers appels, ~98 % ensuite. Le cache se
+    # rechauffe. Une campagne de 2 000 appels a prefixe constant passe donc
+    # l'essentiel de son temps en regime etabli, et c'est ce regime qu'il faut
+    # projeter -- pas le demarrage a froid.
+    "mistral-small-4": {
+        "taux_activation": 0.98,            # regime etabli (passes 3-5)
+        "taux_activation_demarrage": 11 / 20,   # 20 premiers appels
+        "couverture_prefixe": 224 / 252,    # constante mesuree
+        "tokens_caches_par_appel": 220.3,   # regime etabli
+        "n_appels": 100,
+    },
+    "ministral-3b": {
+        "taux_activation": 1.00,
+        "taux_activation_demarrage": 18 / 20,
+        "couverture_prefixe": 128 / 240,
+        "tokens_caches_par_appel": 128.0,
+        "n_appels": 100,
+    },
+}
+CACHE_MESURE_LE = "2026-08-19"
 
 # --- volumes de tokens ------------------------------------------------------
 # ORIGINE : approximation tokens ~ mots x 1,3 appliquee au corpus nettoye. Le
@@ -367,13 +471,38 @@ CACHED_PREFIX_TOKENS = 260
 #           facteur reel a la hausse.
 # STATUT  : estimation. 257 est la valeur la plus susceptible d'etre fausse de
 #           ce bloc.
-AVG_COMPLAINT_TOKENS = 257        # texte de la reclamation, tronque a 1 000 mots
+# ###########  MESURE REELLE -- remplace l'hypothese du 2026-08-11  ###########
+# MESURE le 2026-08-19 sur 40 appels reels (20 reclamations x 2 modeles), par
+# regression `tokens_in ~ nombre de mots` sur des textes de 24 a 534 mots :
+# R2 = 0,9962, pente 1,189 token/mot (et non 1,300 comme suppose).
+# La pente mesuree est appliquee a la distribution de longueur des 2 000 lignes
+# reelles de l'echantillon d'evaluation, d'ou 245 (et non 257).
+#
+# PORTEE : TOKENIZER MISTRAL UNIQUEMENT. Cette valeur ne transfere pas a
+# Anthropic, OpenAI, Google ni DeepSeek, qui ont leurs propres tokenizers.
+# Cf. `FOURNISSEURS_TOKENS_MESURES`.
+AVG_COMPLAINT_TOKENS = 245        # texte de la reclamation, tronque a 1 000 mots
+AVG_COMPLAINT_TOKENS_MESURE_LE = "2026-08-19"
+
+# Ratio mesure tokens/mot (tokenizer Mistral). L'ancienne regle empirique de
+# 1,300 surestimait de 8,5 %.
+TOKENS_PAR_MOT_MESURE = 1.189
+
+# Fournisseurs pour lesquels les VOLUMES de tokens sont mesures. Pour tous les
+# autres, les volumes restent des hypotheses : un flag `hypotheses` global
+# unique ferait passer 8 modeles sur 10 pour mesures.
+FOURNISSEURS_TOKENS_MESURES = frozenset({"Mistral"})
 
 # ORIGINE : comptage a la main d'un prompt type non encore ecrit.
 # STATUT  : estimation grossiere ; sera exact des que le prompt sera fige.
-PROMPT_INSTRUCTION_TOKENS = 200   # role, consigne, format de sortie attendu
-PROMPT_LABELS_TOKENS = 60         # liste des 9 etiquettes
-AVG_OUTPUT_TOKENS = 8             # l'etiquette seule, en sortie
+# MESURE le 2026-08-19 : le prefixe complet (instruction + 9 libelles) vaut 252
+# tokens chez mistral-small. La repartition 200/60 entre les deux blocs reste
+# indicative -- seul leur TOTAL a ete mesure, l'API ne les facture pas separement.
+PROMPT_INSTRUCTION_TOKENS = 194   # role, consigne, format de sortie attendu
+PROMPT_LABELS_TOKENS = 58         # liste des 9 etiquettes  (194 + 58 = 252)
+# MESURE : 9,7 tokens en moyenne chez mistral-small, 9,2 chez ministral, sur
+# une sortie {"label": "..."} . Maximum observe : 13, tres loin des 50 autorises.
+AVG_OUTPUT_TOKENS = 10            # l'etiquette seule, en sortie
 
 # ############  FIN DES HYPOTHESES PROVISOIRES  ############
 
@@ -384,3 +513,149 @@ LLM_MAX_WORDS = 1000
 
 # Volume de reference pour la projection de cout au client.
 DAILY_COMPLAINTS = 1000
+
+
+# ===========================================================================
+# 8. Etape 2 : approche LLM
+# ===========================================================================
+# Bloc AJOUTE a l'etape 2. Rien au-dessus n'a ete modifie : les constantes de
+# l'etape 1 restent telles qu'elles ont ete validees, et `metrics.py` comme
+# `data_prep.py` sont figes.
+
+# --- sorties ----------------------------------------------------------------
+# TOUT ce qui contient du texte de reclamation vit sous data/llm/, deja couvert
+# par la regle `data/` du .gitignore. `reports/` ne recoit que des agregats.
+LLM_DIR = DATA_DIR / "llm"
+
+
+def ensure_llm_dirs() -> None:
+    """Cree data/llm/. Fonction distincte de `ensure_dirs()` a dessein : on ne
+    modifie pas le comportement d'une fonction appelee par le pipeline fige."""
+    LLM_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# --- etiquette hors referentiel ---------------------------------------------
+# Statut rendu par le parsing STRICT quand la reponse du modele n'est pas
+# exploitable. Compte comme une ERREUR dans le F1-macro : un modele qui ne
+# repond pas au format demande n'a pas classe la reclamation, et le masquer
+# derriere une classe de repli embellirait le score.
+#
+# NE DOIT JAMAIS ENTRER DANS `CLASS_ORDER` : cet ordre sert d'axes aux matrices
+# de confusion et de colonnes aux tableaux comparatifs de l'etape 4. Y ajouter
+# une dixieme categorie rendrait les figures LLM et ML non superposables.
+PARSE_ERROR = "PARSE_ERROR"
+
+assert PARSE_ERROR not in CLASS_ORDER, (
+    "PARSE_ERROR ne doit jamais figurer dans CLASS_ORDER : il n'est pas une "
+    "classe du referentiel mais un constat d'echec de format."
+)
+
+# --- parametres d'appel -----------------------------------------------------
+LLM_TEMPERATURE = 0.0
+
+# La sortie attendue ({"label": "..."}) fait une dizaine de tokens. Un
+# depassement de ce plafond est EN SOI un signal de non-conformite au format,
+# a journaliser comme tel plutot qu'a corriger en relevant la limite.
+LLM_MAX_TOKENS = 50
+
+# Tier gratuit Mistral : ~1 requete par seconde. Configurable, car une cle
+# payante leve cette contrainte et diviserait d'autant la duree de campagne.
+LLM_REQUETES_PAR_SECONDE = 1.0
+LLM_MAX_TENTATIVES = 5
+
+# Garde-fou de depense. La campagne s'ARRETE (sans perdre le deja-ecrit, grace
+# a l'ecriture incrementale) si le cout reel cumule depasse ce plafond.
+LLM_BUDGET_MAX_USD = 1.0
+
+# --- identifiants de modele -------------------------------------------------
+# ATTENTION : DEUX ESPACES DE NOMS DISTINCTS, VOLONTAIREMENT NON FUSIONNES.
+#
+#   - les CLES de `MODELS_PRICING` ("mistral-small-4", "ministral-3b") servent a
+#     la TARIFICATION ;
+#   - les identifiants acceptes par l'API Mistral servent aux APPELS.
+#
+# Rien ne garantit qu'ils coincident, et le seul appel verifie a ce jour
+# (`scratch/test_api.py`, `.env.example`) utilise "mistral-small-latest", qui
+# n'est PAS une cle de MODELS_PRICING. L'ecart est donc AVERE pour au moins un
+# modele.
+#
+# Ce dictionnaire n'est PAS une correction : c'est la liste des candidats a
+# VERIFIER contre l'API en debut d'etape 2. Tant que `verifie` vaut False,
+# l'identifiant n'a pas ete confronte a l'API et ne doit pas etre presente
+# comme acquis.
+# VERIFIE le 2026-08-19 par `client.models.list()`. Les deux alias existent, et
+# l'API expose elle-meme leur cible et leur description : la correspondance
+# ci-dessous est CONSTATEE, pas deduite d'une ressemblance de nom.
+#
+# ON APPELLE L'ALIAS, PAS LA VERSION FIGEE. C'est ce qu'un client utiliserait en
+# production, et l'evaluation doit porter sur ce qu'obtient quelqu'un qui appelle
+# l'API normalement. Mais la version REELLEMENT servie est consignee a chaque
+# appel (`modele_resolu`, lu dans la reponse) : si Mistral fait pointer l'alias
+# vers une autre version en cours d'etape 2, les premieres mesures deviendraient
+# incomparables aux suivantes sans que rien ne le signale.
+# `llm_eval.verifie_derive_version()` compare les versions entre campagnes.
+LLM_MODELES_A_COMPARER = {
+    "mistral-small-4": {
+        "id_api_candidat": "mistral-small-latest",
+        "verifie": True,
+        "verifie_le": "2026-08-19",
+        "version_resolue": "mistral-small-2603",
+        "description_api": "Mistral Small 4.",
+        "note": "l'API confirme que l'alias pointe sur Mistral Small 4 (v26.03), "
+                "soit exactement ce que MODELS_PRICING nomme 'mistral-small-4'.",
+    },
+    "ministral-3b": {
+        "id_api_candidat": "ministral-3b-latest",
+        "verifie": True,
+        "verifie_le": "2026-08-19",
+        "version_resolue": "ministral-3b-2512",
+        "description_api": "Ministral 3 (a.k.a. Tinystral) 3B Instruct.",
+        "note": "candidat suppose par symetrie a la phase 1, CONFIRME depuis : "
+                "l'alias existe et pointe sur Ministral 3 3B (v25.12).",
+    },
+}
+
+# --- jeu d'iteration de la phase 2 ------------------------------------------
+# 20 lignes du TRAIN, tirage stratifie deterministe, au moins 2 par classe.
+# On itere sur le train et JAMAIS sur `test_sample_2000.csv` : ajuster un prompt
+# en regardant ses erreurs sur l'echantillon d'evaluation revient a l'optimiser
+# pour ces lignes precises et gonfle le score final -- meme logique que le
+# dedoublonnage avant le split.
+LLM_ITERATION_SIZE = 20
+LLM_ITERATION_MIN_PER_CLASS = 2
+LLM_ITERATION_FILE = PROCESSED_DIR / f"train_iteration_{LLM_ITERATION_SIZE}.csv"
+
+# --- jeu de SELECTION des variantes de prompt (phase 3) ---------------------
+# 20 exemples ne departagent pas des variantes : l'IC a 95 % du F1-macro y fait
+# +/- 20 points (mesure du 2026-08-19). A 200 lignes il tombe a +/- 6,3 points.
+#
+# Tire du TRAIN, avec une graine DISTINCTE de celle des 20, sans recouvrement ni
+# avec `train_iteration_20.csv` ni avec `test_sample_2000.csv`. Le jeu des 20
+# reste le support de la lecture QUALITATIVE des erreurs ; celui-ci sert au
+# chiffre.
+LLM_SELECTION_SIZE = 200
+LLM_SELECTION_MIN_PER_CLASS = 12
+LLM_SELECTION_SEED = 1337          # distincte de RANDOM_SEED (42), a dessein
+LLM_SELECTION_FILE = PROCESSED_DIR / f"train_selection_{LLM_SELECTION_SIZE}.csv"
+
+# Exemples du few-shot (variante v6). Tires du train, HORS des deux jeux
+# ci-dessus : un exemple qui figurerait dans le jeu de selection donnerait au
+# few-shot une reponse qu'il a deja vue, et le gain mesure serait un artefact.
+LLM_FEWSHOT_PAR_CLASSE = 1
+LLM_FEWSHOT_SEED = 7
+LLM_FEWSHOT_FILE = PROCESSED_DIR / "train_fewshot_examples.csv"
+
+# --- styles de prompt -------------------------------------------------------
+# Un style n'est FIGE qu'apres mise au point sur le jeu d'iteration. Le runner
+# REFUSE de demarrer sur `test_sample_2000.csv` avec un style absent de cet
+# ensemble : c'est le garde-fou qui empeche de depenser 2 000 appels sur un
+# prompt encore en cours de reglage.
+# FIGE le 2026-08-19 a l'issue de la phase 3. Cinq modifications independantes
+# de v1 (regle produit, definitions, libelles officiels, francais, few-shot) ont
+# ete mesurees sur 200 lignes du train : AUCUNE ne produit de gain distinguable
+# au test de McNemar apparie sous correction de Holm-Bonferroni. La variante la
+# plus simple l'emporte donc a performance non distinguable.
+#
+# v1_zeroshot ne doit plus etre modifiee jusqu'a la fin de l'etape 2 : son
+# prefixe est epingle par empreinte dans tests/test_llm_prompts.py.
+LLM_STYLES_FIGES: set[str] = {"v1_zeroshot"}

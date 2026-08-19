@@ -691,3 +691,108 @@ client découvrira à notre place, en production.
 ---
 
 *Fin — phase 3bis. La phase 4 (notebook d'exploration) suit.*
+
+---
+
+## Errata — 2026-08-19
+
+**Le corps de ce document n'est pas réécrit.** Il porte les hypothèses de sa date
+de rédaction ; les réactualiser en continu lui ferait perdre sa valeur d'archive
+et rendrait illisible ce qui était su, ou non, au moment des arbitrages.
+
+La §4 annonçait que ces valeurs seraient remplacées par des mesures à l'étape 2.
+C'est fait. Voici ce que la mesure a donné.
+
+### Ce qui a été mesuré (200 appels réels, `mistral-small-2603` et `ministral-3b-2512`)
+
+| valeur | §4 de ce rapport | mesuré | écart |
+|---|---|---|---|
+| `AVG_COMPLAINT_TOKENS` | 257 | **245** | −4,5 % |
+| ratio tokens/mot | 1,3 (règle empirique) | **1,189** | −8,5 % |
+| préfixe constant | ~260 tokens | **252** (mistral-small), **240** (ministral) | −3 % |
+| tokens de sortie | 8 | **10** (max observé : 13) | +25 % |
+| coût 1 000 prédictions, sans cache | 0,0824 $ | **0,0805 $** | −2,3 % |
+
+### Le renversement : la valeur signalée comme « la plus douteuse » ne l'était pas
+
+La §4 désignait `AVG_COMPLAINT_TOKENS = 257` comme **« la plus susceptible d'être
+fausse »**. Elle s'est révélée bonne à 4,5 % près — les deux erreurs qu'elle
+contenait (ratio surestimé de 8,5 %, longueur du corpus sous-estimée) se
+compensant en grande partie.
+
+**L'erreur matérielle était ailleurs, et elle n'était pas signalée comme un
+risque : la modélisation du cache de préfixe.**
+
+Le calcul de la §4 (0,0824 $ → 0,0473 $, soit **−42,6 %**) suppose implicitement
+que le cache s'active à **100 %** des appels et couvre le préfixe **en entier**.
+Les deux hypothèses sont fausses :
+
+- **la couverture est plafonnée et structurellement constante** : 224 tokens sur
+  252 chez `mistral-small` (89 %), 128 sur 240 chez `ministral` (53 %) — jamais
+  une autre valeur sur 200 appels ;
+- **l'activation dépend du réchauffement du cache** : 55 % sur les 20 premiers
+  appels, ~98 % ensuite.
+
+| régime | économie |
+|---|---|
+| démarrage à froid (20 appels) | 20,6 % |
+| **régime établi** — ce qu'obtient une campagne longue | **36,8 %** |
+| borne théorique — la valeur de la §4 | 42,2 % |
+
+La §4 était donc optimiste de **~5 points**, et le plafond de couverture interdit
+d'atteindre sa valeur même à activation totale (37,5 % au mieux).
+
+### Leçon de méthode — le registre des risques visait la mauvaise cible
+
+C'est le résultat le plus transférable de cette mesure, et il vaut plus que la
+correction chiffrée elle-même.
+
+**L'hypothèse désignée comme la plus fragile s'est révélée bonne à 4,5 % près.**
+`AVG_COMPLAINT_TOKENS = 257` était explicitement signalée en §4 comme « la plus
+susceptible d'être fausse » : elle portait une règle empirique (mots × 1,3) non
+vérifiée sur le tokenizer, sur un corpus atypique à 85 % de masquage XXXX. Elle
+était surveillée, donc elle a été mesurée en premier — et elle tenait.
+
+**L'erreur matérielle portait sur une hypothèse qui n'était pas formulée.** Le
+modèle de cache supposait une activation à 100 % des appels et une couverture
+totale du préfixe. Ces deux suppositions n'apparaissent nulle part dans le
+registre des risques : elles n'étaient pas *estimées*, elles étaient *implicites
+dans la structure du calcul*. Personne n'a écrit « on suppose que le cache
+s'active toujours » — le calcul le supposait sans le dire.
+
+**Ce qui distingue les deux.** Une valeur numérique incertaine se voit : elle
+porte un nombre, on peut lui attacher une fourchette et un plan de vérification.
+Une hypothèse structurelle est invisible parce qu'elle n'a pas de valeur propre —
+elle est encodée dans la forme de la formule. `estimate_cost()` n'a jamais eu de
+paramètre « taux d'activation du cache » : c'est justement pour cela que
+personne ne pouvait le remettre en question.
+
+**Conséquence pratique pour la suite du projet** : lors de la revue d'un calcul
+projeté, ne pas se limiter à interroger les constantes. Demander aussi *quelles
+suppositions la structure du calcul fait sans les nommer* — un dénominateur
+supposé constant, un taux supposé unitaire, un comportement supposé
+déterministe. Ce sont ces suppositions-là qui échappent aux registres de risques,
+parce qu'un registre recense des valeurs et non des formes.
+
+Appliqué à l'étape 3 : les projections de temps d'entraînement et d'inférence du
+ML porteront les mêmes suppositions implicites (parallélisme effectif, cache
+disque chaud, taille de lot). Elles doivent être nommées avant d'être chiffrées.
+
+### Portée des mesures
+
+Ces volumes sont mesurés avec le **tokenizer Mistral**. Ils ne transfèrent ni à
+Anthropic, ni à OpenAI, ni à Google, ni à DeepSeek. Le tableau des 10 modèles de
+la §4 reste donc, pour 8 d'entre eux, une **projection sous hypothèse** — et sa
+colonne « avec cache » est une **borne théorique**, pas une prévision.
+`config.FOURNISSEURS_TOKENS_MESURES` porte cette distinction dans le code.
+
+### Conclusions inchangées
+
+Le coût n'est toujours pas le facteur discriminant : la fourchette annuelle va de
+19 $ à 1 017 $ pour 1 000 réclamations quotidiennes, et c'est la **latence** qui
+contraint l'approche LLM. Les arbitrages de l'étape 1 ne sont pas affectés.
+
+**Source unique de vérité** : `MODELS_PRICING`, `AVG_COMPLAINT_TOKENS`,
+`CACHED_PREFIX_TOKENS_PAR_MODELE` et `CACHE_MESURE` dans `src/config.py`, avec
+leurs dates de relevé. Aucun chiffre de coût ne doit être repris depuis ce
+rapport.

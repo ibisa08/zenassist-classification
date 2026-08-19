@@ -402,3 +402,28 @@ estimate_cost(1000, "mistral-small-4", cached_prefix_tokens=260)
 `estimate_cost()` bascule automatiquement sur le tarif standard (+50 %) et lève un
 avertissement passé cette date. Les revérifier avant toute projection présentée au
 client.
+
+---
+
+## Errata — 2026-08-19 (étape 2)
+
+Les chiffres de coût de ce README datent de l'étape 1 et reposaient sur des
+**hypothèses non mesurées**. L'étape 2 les a mesurés sur 200 appels réels. Le
+corps du document n'est pas réécrit — c'est un livrable daté.
+
+| affirmation du README | statut |
+|---|---|
+| « fourchette de **19 $** à **1 031 $** par an » | **1 017 $** après mesure des tokens ; l'ordre de grandeur et la conclusion sont inchangés |
+| « préfixe constant **~260 tokens** » | mesuré à **252** (`mistral-small`) et **240** (`ministral-3b`) |
+| « le cache réduit la facture de **~43 %** » | **borne théorique**. Mesuré : **36,8 %** en régime établi, 20,6 % au démarrage à froid |
+
+Le cache ne couvre jamais tout le préfixe (plafond structurel à 224 tokens sur
+252) et son activation dépend du réchauffement (55 % sur les 20 premiers appels,
+~98 % ensuite). Le détail est dans l'errata de
+[`reports/limites.md`](reports/limites.md).
+
+**La conclusion du projet est inchangée** : le coût n'est pas le facteur
+discriminant, la latence l'est.
+
+Source unique de vérité pour tout chiffre de coût : `src/config.py`
+(`MODELS_PRICING`, `PRICING_CHECKED_ON`, `CACHE_MESURE`).
