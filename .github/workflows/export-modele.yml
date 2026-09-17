@@ -105,6 +105,7 @@ jobs:
       - name: Preparation des donnees et controle C0
         run: |
           set -euo pipefail
+          mkdir -p sorties
           debut=$(date +%s)
           python -m src.data_prep
           echo "DUREE_DATA_PREP=$(( $(date +%s) - debut ))" >> "$GITHUB_ENV"
@@ -144,15 +145,16 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG_RELEASE: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "$TAG_RELEASE" \
             models/LinearSVC.pkl \
             models/LinearSVC.metadata.json \
             sorties/controle_donnees.json \
             sorties/controle_modele.json \
             sorties/SHA256SUMS \
-            --repo "${{ github.repository }}" \
+            --repo "$GITHUB_REPOSITORY" \
             --clobber
 
       # Lancement manuel : on ne publie PAS le pickle de 124 Mo en artefact.

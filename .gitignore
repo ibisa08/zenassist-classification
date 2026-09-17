@@ -63,6 +63,14 @@ models/*
 # .claude/settings.json de projet, lui, serait versionne.
 .claude/settings.local.json
 
+# --- rapports de controle CI ------------------------------------------------
+# `tools/controle_ci.py` ecrit ses rapports dans sorties/. En integration
+# continue ils sont publies comme assets de release ou comme artefacts du
+# lancement manuel ; en local ce sont des fichiers de travail, dates de la
+# derniere execution. Les versionner ferait croire a une reference alors que
+# la seule reference est ci/reference.json.
+sorties/
+
 # --- systeme ---------------------------------------------------------------
 .DS_Store
 Thumbs.db

@@ -482,6 +482,21 @@ décisionnelle** — elle ne vaut qu'à version de scikit-learn égale.
 Un lancement manuel ne publie **pas** le pickle : seuls les métadonnées et les
 rapports sont déposés en artefacts, avec une rétention de 5 jours.
 
+⚠️ **Une release dont l'export échoue reste publiée, sans pickle.** Le workflow
+se déclenche *après* la création de la release : si le job échoue, quelle qu'en
+soit la raison — C0 faux, verdict C3, test en échec, corpus indisponible — la
+release existe déjà et reste visible, avec ses notes et son tag, mais sans
+aucun asset de modèle. Une relance du workflow ne suffit pas toujours, car le
+tag pointe sur le commit d'origine. La marche à suivre est de supprimer la
+release et son tag, puis d'en recréer une une fois la cause corrigée :
+
+```bash
+gh release delete modele-v1.0.0 --cleanup-tag
+```
+
+Laisser une release vide en place est le pire des cas : elle a l'apparence d'un
+modèle livré et n'en contient aucun.
+
 ### Nommage des releases
 
 | Type | Convention | Exemple |
