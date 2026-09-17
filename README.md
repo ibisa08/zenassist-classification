@@ -532,20 +532,35 @@ aucun effet sur lui.
 ### Récupération du modèle
 
 `models/` est exclu du dépôt. Le pickle et ses métadonnées se récupèrent depuis
-la release correspondante :
+la release correspondante, puis se vérifient contre les empreintes publiées
+avec elle :
 
 ```bash
-gh release download modele-v1.0.0 --pattern 'LinearSVC.*' --dir models
+gh release download modele-v1.0.0 --repo ibisa08/zenassist-classification \
+  --pattern 'LinearSVC.*' --pattern SHA256SUMS --dir models/modele-v1.0.0
+(cd models/modele-v1.0.0 && grep 'LinearSVC' SHA256SUMS | sed 's#models/##' | shasum -a 256 -c -)
 ```
 
 À défaut, `python tools/export_modele.py --modele LinearSVC` le reconstruit,
-ce qui suppose `data/processed/train.csv` présent.
+ce qui suppose `data/processed/train.csv` présent. Le pickle obtenu aura une
+autre empreinte sha256 que celui de la release, sans que les prédictions
+diffèrent : voir
+[`reports/resultats_alignement_env.md`](reports/resultats_alignement_env.md).
+
+### Modèle servi par défaut
+
+Le service ne charge pas « le dernier modèle disponible » : la release servie
+est fixée par la constante `VERSION_MODELE_SERVI` dans
+[`api/modele.py`](api/modele.py), actuellement `modele-v1.0.0`. Changer de
+modèle servi change les réponses rendues aux clients : cela passe donc par une
+modification de cette constante, donc par un commit relisible, et non par le
+contenu d'un dossier.
 
 ### Variables d'environnement
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `ZENASSIST_MODELE_PKL` | `models/LinearSVC.pkl` | chemin du pickle servi |
+| `ZENASSIST_MODELE_PKL` | `models/<VERSION_MODELE_SERVI>/LinearSVC.pkl` | chemin du pickle servi |
 | `ZENASSIST_MODELE_META` | `<pickle>.metadata.json` | chemin des métadonnées |
 
 ### Lancement

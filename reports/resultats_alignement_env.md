@@ -174,3 +174,11 @@ L'empreinte de contenu diffère entre macOS et Linux alors que les prédictions
 sont identiques : elle n'est pas portable d'une plateforme à l'autre et reste
 non décisionnelle, comme le prévoyait le protocole. Seule la comparaison des
 prédictions sert de critère.
+
+Deux exports successifs sous Linux (lancement manuel puis release
+modele-v1.0.0) ont produit des pickles d'empreintes sha256 différentes
+(9a6487c7… puis b63addf5…), avec des prédictions identiques à la
+référence dans les deux cas. Le sha256 du pickle identifie un fichier,
+non un modèle ; il varie d'un processus à l'autre, comme le documente
+tests/test_export_modele.py. Il sert au contrôle d'intégrité du fichier
+livré, jamais au contrôle de reproductibilité.

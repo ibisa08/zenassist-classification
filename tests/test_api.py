@@ -37,8 +37,9 @@ from fastapi import FastAPI                     # noqa: E402
 from fastapi.testclient import TestClient       # noqa: E402
 
 from api.main import LONGUEUR_MAX_RECLAMATION, app, lifespan  # noqa: E402
-from api.modele import (ModeleNonConforme, charge_modele,     # noqa: E402
-                        chemins, sha256_fichier)
+from api.modele import (COMMANDE_RECUPERATION, VERSION_MODELE_SERVI,  # noqa: E402
+                        ModeleNonConforme, charge_modele, chemins,
+                        sha256_fichier)
 from src import config as cfg                   # noqa: E402
 from src.data_prep import load_eval_sample      # noqa: E402
 
@@ -110,13 +111,28 @@ def _demarrage_echoue(pkl: Path, meta: Path | None = None):
 def main() -> int:
     pkl, meta_path = chemins()
     if not pkl.exists():
-        print(f"IGNORE : {pkl.name} absent (models/ est exclu du depot).")
-        print("Recuperer le modele depuis une release, ou le reconstruire avec")
-        print("`python tools/export_modele.py --modele LinearSVC`.")
-        return 0
+        # Code 2, PAS 0. Un test qui n'a rien teste n'est pas un test qui
+        # passe : en integration continue, un `exit 0` ici rendrait le
+        # service verifiable en apparence alors qu'aucune de ses garanties
+        # n'aurait ete controlee.
+        print(f"ECHEC : modele absent -> {pkl}")
+        print("`models/` est exclu du depot. Recuperer la release servie :")
+        print(f"    {COMMANDE_RECUPERATION}")
+        print("Ou changer de modele avec ZENASSIST_MODELE_PKL.")
+        return 2
 
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     sha_reel = sha256_fichier(pkl)
+
+    # --- 0. chemin par defaut -------------------------------------------------
+    # Le modele servi par defaut est celui d'une release NOMMEE, pas le
+    # contenu de models/ : le service ne doit pas changer de comportement
+    # parce qu'un fichier a ete depose a cote.
+    check("le pickle par defaut est celui de la release servie",
+          pkl.parent.name == VERSION_MODELE_SERVI,
+          f"{pkl.parent.name}/{pkl.name}")
+    check("les metadonnees sont a cote du pickle",
+          meta_path.parent == pkl.parent, meta_path.name)
 
     # --- 1. demarrage et /health ---------------------------------------------
     with TestClient(app) as client:
@@ -190,29 +206,43 @@ def main() -> int:
             json={"user_claim": "a" * LONGUEUR_MAX_RECLAMATION}).status_code
         check("200 : exactement la longueur maximale", code == 200, str(code))
 
-        # --- 5. journalisation sans le texte ---------------------------------
+        # --- 5. journalisation ------------------------------------------------
+        # Le logger doit etre CONFIGURE, pas seulement appele : sans handler ni
+        # niveau propres, uvicorn laisse le logger racine filtrer les INFO et
+        # le service tourne sans journaliser une seule requete.
+        journal = logging.getLogger("zenassist.api")
+        flux = [h for h in journal.handlers
+                if isinstance(h, logging.StreamHandler)]
+        check("le logger a au moins un StreamHandler", bool(flux),
+              f"{len(journal.handlers)} handler(s)")
+        check("le logger est au niveau INFO",
+              journal.level == logging.INFO,
+              logging.getLevelName(journal.level))
+        check("le logger ne propage pas (pas de doublon)",
+              journal.propagate is False, str(journal.propagate))
+
         capture = JournalCapture()
         capture.setFormatter(logging.Formatter("%(message)s"))
-        journal = logging.getLogger("zenassist.api")
-        niveau = journal.level
         journal.addHandler(capture)
-        journal.setLevel(logging.INFO)
         try:
-            temoin = ("Temoin unique de journalisation NEPASJOURNALISER, "
-                      "mon compte bancaire a ete debite a tort.")
+            sentinelle = "NEPASJOURNALISER-7781"
+            temoin = (f"{sentinelle} mon compte bancaire a ete debite a tort "
+                      "et les frais preleves deux fois.")
             rep = client.post("/tags", json={"user_claim": temoin})
         finally:
             journal.removeHandler(capture)
-            journal.setLevel(niveau)
 
-        journalise = "\n".join(capture.lignes)
+        check("le handler de capture est retire", capture not in journal.handlers)
         check("une ligne de journal par requete /tags",
               len(capture.lignes) >= 1, f"{len(capture.lignes)} ligne(s)")
-        check("le journal ne contient pas le texte de la reclamation",
-              "NEPASJOURNALISER" not in journalise and temoin not in journalise)
-        check("le journal porte le tag et la duree",
-              rep.json()["tag"] in journalise and "duree_ms=" in journalise,
-              journalise.strip().splitlines()[-1] if capture.lignes else "")
+        check("un enregistrement porte `tag=`",
+              any("tag=" in l for l in capture.lignes))
+        check("aucun enregistrement ne contient la sentinelle",
+              not any(sentinelle in l or temoin in l for l in capture.lignes))
+        check("le journal porte le tag rendu et la duree",
+              any(rep.json()["tag"] in l and "duree_ms=" in l
+                  for l in capture.lignes),
+              capture.lignes[-1] if capture.lignes else "")
 
     # --- 4. garde-fous du chargement ------------------------------------------
     # Tout se passe dans un dossier temporaire : le modele servi n'est jamais

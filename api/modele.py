@@ -27,7 +27,8 @@ servir de garde-fou au demarrage.
 CONFIGURATION
 -------------
     ZENASSIST_MODELE_PKL    chemin du pickle
-                            (defaut : <racine>/models/LinearSVC.pkl)
+                            (defaut : <racine>/models/<VERSION_MODELE_SERVI>/
+                             LinearSVC.pkl)
     ZENASSIST_MODELE_META   chemin des metadonnees
                             (defaut : <pickle sans suffixe>.metadata.json)
 """
@@ -47,7 +48,19 @@ RACINE = Path(__file__).resolve().parent
 while not (RACINE / "src" / "config.py").exists() and RACINE != RACINE.parent:
     RACINE = RACINE.parent
 
-PKL_PAR_DEFAUT = RACINE / "models" / "LinearSVC.pkl"
+# Release du modele servie par defaut. Le service ne prend PAS « le dernier
+# modele disponible » : changer de modele servi, c'est changer les predictions
+# rendues aux clients, donc un commit explicite et revisable, pas un effet de
+# bord du contenu d'un dossier.
+VERSION_MODELE_SERVI = "modele-v1.0.0"
+
+PKL_PAR_DEFAUT = RACINE / "models" / VERSION_MODELE_SERVI / "LinearSVC.pkl"
+
+COMMANDE_RECUPERATION = (
+    f"gh release download {VERSION_MODELE_SERVI} "
+    "--repo ibisa08/zenassist-classification "
+    "--pattern 'LinearSVC.*' --pattern SHA256SUMS "
+    f"--dir models/{VERSION_MODELE_SERVI}")
 
 
 class ModeleNonConforme(RuntimeError):
@@ -110,7 +123,10 @@ def charge_modele() -> ModeleServi:
     """
     pkl, meta_path = chemins()
     if not pkl.exists():
-        raise FileNotFoundError(f"Modele absent : {pkl}")
+        raise FileNotFoundError(
+            f"Modele absent : {pkl}\n"
+            "`models/` est exclu du depot. Recuperer la release servie :\n"
+            f"    {COMMANDE_RECUPERATION}")
     if not meta_path.exists():
         raise FileNotFoundError(f"Metadonnees absentes : {meta_path}")
 

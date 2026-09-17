@@ -44,6 +44,23 @@ LONGUEUR_MAX_RECLAMATION = 32_000
 
 journal = logging.getLogger("zenassist.api")
 
+# Uvicorn configure SES loggers (`uvicorn`, `uvicorn.access`), pas ceux de
+# l'application. Sans handler ni niveau explicites, le logger racine s'applique
+# avec son niveau par defaut, WARNING, et toutes les lignes INFO ci-dessous
+# sont filtrees : le service tournerait sans jamais journaliser une requete,
+# et personne ne s'en apercevrait avant d'en avoir besoin.
+#
+# `propagate = False` evite le doublon quand une configuration racine existe
+# deja -- une ligne emise deux fois dans un agregateur de journaux, c'est un
+# compteur faux.
+if not journal.handlers:
+    _sortie = logging.StreamHandler()
+    _sortie.setFormatter(
+        logging.Formatter("%(levelname)s:     %(name)s - %(message)s"))
+    journal.addHandler(_sortie)
+journal.setLevel(logging.INFO)
+journal.propagate = False
+
 
 class Reclamation(BaseModel):
     """Corps attendu par `POST /tags`."""
