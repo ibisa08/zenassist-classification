@@ -1364,8 +1364,13 @@ md(r"""
   lignes d'entraînement, évalué **deux fois** (sur les 2 000 pondérées pour la
   comparaison, sur le test complet pour montrer l'apport du volume), puis analyse
   d'erreurs croisée.
-- **Étape 4 — recommandation** : arbitrage sur F1-macro, F1 par classe, latence p95,
-  coût et maintenabilité.
+- **Étape 4 — recommandation** : diaporama de 5 à 15 diapositives destiné à l'équipe
+  ZenAssist — un product owner, deux développeurs, **aucune compétence IA en interne**.
+  Il doit établir cinq choses : la **justification des métriques** retenues, les
+  **performances** des deux approches, leurs **temps de réponse rapportés à
+  l'expérience utilisateur visée**, un **plan de mise en production de chacune avec son
+  temps de mise en place** et ses coûts — implémentation et exploitation distingués —
+  et une **recommandation explicite et justifiée**.
 
 ---
 
