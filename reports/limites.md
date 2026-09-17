@@ -796,3 +796,31 @@ contraint l'approche LLM. Les arbitrages de l'étape 1 ne sont pas affectés.
 `CACHED_PREFIX_TOKENS_PAR_MODELE` et `CACHE_MESURE` dans `src/config.py`, avec
 leurs dates de relevé. Aucun chiffre de coût ne doit être repris depuis ce
 rapport.
+
+---
+
+## Erratum — environnement d'exécution de l'export du modèle et du notebook (constaté le 2026-09-17)
+
+L'export du modèle du 2026-08-19 et la ré-exécution du notebook
+d'exploration ont été réalisés sous l'interpréteur Anaconda de base
+(scikit-learn 1.6.1, pandas 2.2.3, matplotlib 3.10.0), et non sous
+l'environnement de référence déclaré dans requirements.txt (.venv :
+scikit-learn 1.9.0, pandas 3.0.5, matplotlib 3.11.1). Cause probable :
+interpréteur invoqué sans chemin explicite.
+
+Impact mesuré selon un protocole pré-enregistré
+(reports/protocole_alignement_env.md, résultats dans
+reports/resultats_alignement_env.md) : chaîne de données reproduite à
+l'identique (sha256) ; modèle réentraîné sous le .venv produisant des
+prédictions identiques sur les 70 863 lignes du test et sur
+l'échantillon de 2 000 ; F1-macro inchangés. Aucune métrique publiée
+n'est modifiée.
+
+Mesures correctives : interpréteur toujours invoqué par chemin
+explicite ; contrôle de la version de scikit-learn à ajouter au script
+d'export ; même contrôle dans l'intégration continue.
+
+Portée non vérifiée : les exports LogisticRegression et MultinomialNB
+(même date, même interpréteur) n'ont pas été réalignés ; ils ne sont
+pas candidats à la mise en production. Les latences de l'étape 3
+restent datées de scikit-learn 1.6.1.
