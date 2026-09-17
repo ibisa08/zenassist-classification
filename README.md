@@ -405,6 +405,98 @@ client.
 
 ---
 
+## Intégration continue — export du modèle
+
+`models/` est exclu du dépôt : un pickle de 124 Mo par version rendrait le clone
+inutilisable, et le contenu est reproductible. Encore faut-il le prouver à chaque
+fois. C'est l'objet du workflow
+[`.github/workflows/export-modele.yml`](.github/workflows/export-modele.yml) :
+il reconstruit le modèle depuis le corpus publié, vérifie qu'il se comporte
+comme la référence figée, puis attache l'artefact à la release.
+
+### Déclencheurs
+
+| Événement | Effet |
+|---|---|
+| `release` publiée, tag ne commençant **pas** par `data-` | export complet et publication des assets sur la release |
+| `workflow_dispatch` | export complet, artefacts de contrôle seulement |
+| `release` publiée, tag `data-*` | **job ignoré** |
+
+Les releases de données sont écartées à dessein : publier un corpus ne doit pas
+produire un modèle que personne n'a demandé. Le corpus vit sous ses propres tags
+(`data-v1`), le modèle sous les siens.
+
+Lancement manuel :
+
+```bash
+gh workflow run export-modele.yml
+```
+
+### Ce que fait le job
+
+1. Installe Python 3.13 et les dépendances de `requirements.txt`, puis **échoue
+   si la version de scikit-learn installée diffère de celle épinglée**.
+2. Télécharge `dataset.csv.gz` et `SHA256SUMS` de la release `data-v1`, vérifie
+   l'empreinte de l'archive, décompresse, puis vérifie l'empreinte du CSV
+   décompressé.
+3. Rejoue `python -m src.data_prep`, puis le contrôle **C0**.
+4. Exécute les trois fichiers de tests ; un seul échec fait échouer le job.
+5. Exporte le modèle, puis exécute le contrôle **C1 / C2 / C3**.
+6. Écrit `sorties/SHA256SUMS`, publie les assets, et rédige un résumé lisible
+   dans l'onglet de résultats du workflow.
+
+Le job n'utilise aucun secret autre que `github.token`, et n'affiche jamais de
+contenu de réclamation dans les journaux.
+
+### Critères de conformité
+
+Les seuils ne sont pas écrits dans le workflow : ils sont lus dans
+[`ci/reference.json`](ci/reference.json), seule source de vérité. Leur
+définition et leur justification sont dans
+[`reports/protocole_alignement_env.md`](reports/protocole_alignement_env.md) ;
+les mesures qui ont établi la référence actuelle sont dans
+[`reports/resultats_alignement_env.md`](reports/resultats_alignement_env.md).
+
+| Critère | Signification | Conséquence |
+|---|---|---|
+| **C0** | les quatre empreintes de données correspondent à la référence | si faux, arrêt immédiat : comparer des modèles n'aurait aucun sens |
+| **C1** | prédictions **identiques** à la référence, sur les 70 863 lignes du test et sur l'échantillon de 2 000 | métriques publiées inchangées |
+| **C2** | non identiques, mais accord ≥ 99,9 % sur le test et \|Δ F1-macro\| ≤ 0,002 sur les deux jeux | nouvelle référence acceptable, métriques à corriger par erratum |
+| **C3** | tout autre cas | job en échec, investigation |
+
+Le contrôle porte sur les **prédictions**, pas seulement sur les scores : deux
+modèles peuvent afficher le même F1-macro en se trompant sur des lignes
+différentes. L'empreinte de contenu du modèle est rapportée mais **n'est pas
+décisionnelle** — elle ne vaut qu'à version de scikit-learn égale.
+
+### Assets publiés sur une release de modèle
+
+| Fichier | Contenu |
+|---|---|
+| `LinearSVC.pkl` | le modèle sérialisé |
+| `LinearSVC.metadata.json` | configuration, vocabulaire, empreintes, versions |
+| `controle_donnees.json` | rapport C0 |
+| `controle_modele.json` | rapport C1/C2/C3, écarts par jeu |
+| `SHA256SUMS` | empreintes des quatre fichiers ci-dessus |
+
+Un lancement manuel ne publie **pas** le pickle : seuls les métadonnées et les
+rapports sont déposés en artefacts, avec une rétention de 5 jours.
+
+### Nommage des releases
+
+| Type | Convention | Exemple |
+|---|---|---|
+| modèle | `modele-vMAJEUR.MINEUR.PATCH` | `modele-v1.0.0` |
+| données | `data-vN` | `data-v1` |
+
+Pour le modèle : **MAJEUR** change quand les prédictions changent de façon
+décisionnelle (verdict C3 assumé, nouveau référentiel de classes) ; **MINEUR**
+quand le modèle est réentraîné sous un environnement ou des données révisés en
+restant conforme C1 ou C2 ; **PATCH** pour tout ce qui n'affecte pas le modèle
+lui-même (métadonnées, rapports, documentation de la release).
+
+---
+
 ## Errata — 2026-08-19 (étape 2)
 
 Les chiffres de coût de ce README datent de l'étape 1 et reposaient sur des

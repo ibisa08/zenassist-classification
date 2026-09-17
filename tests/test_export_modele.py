@@ -143,6 +143,58 @@ def main() -> int:
           ex.VECTORISEUR == dict(lowercase=True, sublinear_tf=True,
                                  ngram_range=(1, 2), min_df=2))
 
+    # --- 7. controle de la version de scikit-learn ---------------------------
+    # L'export du 2026-08-19 est parti sous scikit-learn 1.6.1 alors que
+    # requirements.txt epingle 1.9.0, sans que rien ne le signale. Le garde-fou
+    # n'a de valeur que si son ECHEC est verifie, pas seulement son succes.
+    import sklearn
+
+    check("verifie_version_sklearn passe sous l'environnement courant",
+          ex.verifie_version_sklearn() == sklearn.__version__,
+          sklearn.__version__)
+    check("version requise lue depuis requirements.txt",
+          ex.version_sklearn_requise() == sklearn.__version__,
+          ex.version_sklearn_requise())
+
+    lecture_reelle = ex.version_sklearn_requise
+    try:
+        ex.version_sklearn_requise = lambda *a, **k: "0.0.0-inexistante"
+        try:
+            ex.verifie_version_sklearn()
+            leve, message = False, ""
+        except SystemExit as e:
+            leve, message = True, str(e)
+    finally:
+        ex.version_sklearn_requise = lecture_reelle
+
+    check("version attendue differente -> SystemExit", leve)
+    check("le message nomme l'attendu, l'installe et l'interpreteur",
+          leve and "0.0.0-inexistante" in message
+          and sklearn.__version__ in message and sys.executable in message)
+    check("lecture reelle restauree apres le test",
+          ex.version_sklearn_requise is lecture_reelle
+          and ex.version_sklearn_requise() == sklearn.__version__)
+
+    # Le controle doit preceder l'entrainement, y compris sous `--verifie` :
+    # on simule une version non conforme et on verifie que `main()` sort AVANT
+    # d'avoir ajuste quoi que ce soit (`entraine` remplace par un piege).
+    entraine_reel, appels = ex.entraine, []
+    try:
+        ex.version_sklearn_requise = lambda *a, **k: "0.0.0-inexistante"
+        ex.entraine = lambda *a, **k: appels.append(1)
+        try:
+            ex.main(["--modele", "LinearSVC", "--verifie"])
+            leve2 = False
+        except SystemExit:
+            leve2 = True
+    finally:
+        ex.version_sklearn_requise = lecture_reelle
+        ex.entraine = entraine_reel
+
+    check("`--verifie` est soumis au controle de version", leve2)
+    check("aucun entrainement n'a ete lance avant le controle",
+          appels == [], f"{len(appels)} appel(s) a entraine()")
+
     print("\n" + "=" * 78)
     print(f"RESULTAT : {sum(_RESULTATS)}/{len(_RESULTATS)} verifications passees")
     if not all(_RESULTATS):

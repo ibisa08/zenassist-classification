@@ -93,6 +93,7 @@ import hashlib
 import json
 import pickle
 import platform
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -193,6 +194,60 @@ def sha256_fichier(path: Path) -> str:
 
 
 # ===========================================================================
+# Controle de l'environnement
+# ===========================================================================
+# L'export du 2026-08-19 a ete produit sous l'interpreteur Anaconda de base
+# (scikit-learn 1.6.1) et non sous le `.venv` declare dans requirements.txt
+# (1.9.0), parce que `python` avait ete invoque sans chemin explicite. Rien
+# dans le script ne l'a signale : les metadonnees ont enregistre la version
+# effective, et c'est tout. Voir reports/limites.md, erratum du 2026-09-17.
+#
+# Ce controle n'a PAS d'option de contournement. Un garde-fou qu'on peut
+# desactiver par un drapeau est desactive le jour ou il derange.
+VERSION_REQUISE_RE = r"^\s*scikit-learn\s*==\s*([0-9A-Za-z.\-]+)\s*$"
+
+
+def version_sklearn_requise(chemin: Path | None = None) -> str:
+    """Version de scikit-learn epinglee dans requirements.txt.
+
+    Fonction separee de la verification pour rester substituable dans les
+    tests : c'est la LECTURE qu'on simule, pas la comparaison.
+    """
+    chemin = chemin or (RACINE / "requirements.txt")
+    if not chemin.exists():
+        raise SystemExit(f"Fichier introuvable : {chemin}")
+    for ligne in chemin.read_text(encoding="utf-8").splitlines():
+        m = re.match(VERSION_REQUISE_RE, ligne)
+        if m:
+            return m.group(1)
+    raise SystemExit(
+        f"Aucune ligne `scikit-learn==...` dans {chemin.name}. "
+        "L'environnement de reference n'est plus declare : export refuse.")
+
+
+def verifie_version_sklearn() -> str:
+    """Refuse l'export si scikit-learn ne correspond pas a requirements.txt.
+
+    Un modele entraine sous une autre version reste chargeable, mais il n'est
+    plus l'artefact que le depot decrit. Le controle porte sur la version
+    INSTALLEE, pas sur le chemin de l'interpreteur : c'est la propriete qui
+    compte, et elle se verifie.
+    """
+    attendue = version_sklearn_requise()
+    installee = sklearn.__version__
+    if attendue != installee:
+        raise SystemExit(
+            "Version de scikit-learn non conforme a l'environnement de "
+            "reference.\n"
+            f"  attendue (requirements.txt) : {attendue}\n"
+            f"  installee                   : {installee}\n"
+            f"  interpreteur                : {sys.executable}\n"
+            "Installer l'environnement declare, ou invoquer l'interpreteur du\n"
+            "`.venv` par son chemin explicite. Export refuse.")
+    return installee
+
+
+# ===========================================================================
 # Entrainement
 # ===========================================================================
 def charge_train(echantillon: int | None = None) -> tuple:
@@ -289,6 +344,12 @@ def main(argv=None) -> int:
     p.add_argument("--sans-scores", action="store_true",
                    help="autorise l'absence de reports/etape3_scores.json")
     a = p.parse_args(argv)
+
+    # AVANT tout entrainement, et dans tous les modes : un export produit sous
+    # une autre version de scikit-learn que celle declaree n'est pas l'artefact
+    # que le depot decrit, et `--verifie` comparerait une empreinte a une
+    # reference obtenue ailleurs.
+    verifie_version_sklearn()
 
     pipe, n = entraine(a.modele, a.echantillon)
     emp = empreinte_contenu(pipe)

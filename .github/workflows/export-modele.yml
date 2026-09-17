@@ -1,0 +1,228 @@
+# Export versionne du modele LinearSVC.
+#
+# Le modele n'est pas dans le depot : il est reproductible, et un pickle de
+# 124 Mo par version rendrait le clone inutilisable. Ce workflow le reconstruit
+# a partir du jeu de donnees publie en release `data-v1`, verifie qu'il se
+# comporte comme la reference figee dans `ci/reference.json`, puis attache
+# l'artefact a la release.
+#
+# Les releases de donnees (`data-*`) sont ignorees : publier un corpus ne doit
+# pas declencher un export de modele, sinon toute correction de donnees
+# produirait un modele que personne n'a demande.
+#
+# Criteres C0 / C1 / C2 : reports/protocole_alignement_env.md.
+name: Export du modele
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    # `data-*` exclu : seules les releases de modele declenchent un export.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' &&
+       !startsWith(github.event.release.tag_name, 'data-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Recuperation du depot
+        uses: actions/checkout@v4
+
+      - name: Installation de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Dependances et controle de version
+        run: |
+          set -euo pipefail
+          which python
+          python --version
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python - <<'PY'
+          import re, sys, sklearn, numpy, scipy, pandas, platform
+          print("plateforme   :", platform.platform())
+          print("python       :", platform.python_version())
+          print("scikit-learn :", sklearn.__version__)
+          print("numpy        :", numpy.__version__)
+          print("scipy        :", scipy.__version__)
+          print("pandas       :", pandas.__version__)
+          attendue = None
+          for ligne in open("requirements.txt", encoding="utf-8"):
+              m = re.match(r"\s*scikit-learn\s*==\s*([0-9A-Za-z.\-]+)\s*$", ligne)
+              if m:
+                  attendue = m.group(1)
+                  break
+          if attendue != sklearn.__version__:
+              sys.exit(f"scikit-learn {sklearn.__version__} installe, "
+                       f"{attendue} attendu par requirements.txt")
+          print("VERSION_CONFORME=True")
+          PY
+
+      - name: Jeu de donnees (release data-v1)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          gh release download data-v1 \
+            --repo "${{ github.repository }}" \
+            --pattern 'dataset.csv.gz' --pattern 'SHA256SUMS' \
+            --dir "$tmp"
+
+          # 1. integrite de l'archive telle que publiee.
+          ( cd "$tmp" && grep ' dataset\.csv\.gz$' SHA256SUMS | sha256sum --check - )
+
+          # 2. decompression, puis integrite du CSV lui-meme : une archive
+          #    valide peut contenir autre chose que ce que la CI attend.
+          mkdir -p data/raw
+          gunzip -c "$tmp/dataset.csv.gz" > data/raw/dataset.csv
+          attendu="$(grep ' dataset\.csv$' "$tmp/SHA256SUMS" | awk '{print $1}')"
+          obtenu="$(sha256sum data/raw/dataset.csv | awk '{print $1}')"
+          if [ -z "$attendu" ]; then
+            echo "Aucune ligne dataset.csv dans SHA256SUMS" >&2
+            exit 1
+          fi
+          if [ "$attendu" != "$obtenu" ]; then
+            echo "sha256 du CSV decompresse non conforme" >&2
+            echo "  attendu : $attendu" >&2
+            echo "  obtenu  : $obtenu" >&2
+            exit 1
+          fi
+          echo "DATASET_CONFORME=True"
+          rm -rf "$tmp"
+
+      - name: Preparation des donnees et controle C0
+        run: |
+          set -euo pipefail
+          debut=$(date +%s)
+          python -m src.data_prep
+          echo "DUREE_DATA_PREP=$(( $(date +%s) - debut ))" >> "$GITHUB_ENV"
+          python tools/controle_ci.py donnees --rapport sorties/controle_donnees.json
+
+      - name: Tests de non-regression
+        run: |
+          set -euo pipefail
+          python tests/test_metrics_gel.py
+          python tests/test_pipeline.py
+          python tests/test_export_modele.py
+
+      - name: Export du modele
+        run: |
+          set -euo pipefail
+          debut=$(date +%s)
+          python tools/export_modele.py --modele LinearSVC
+          echo "DUREE_EXPORT=$(( $(date +%s) - debut ))" >> "$GITHUB_ENV"
+
+      - name: Controle du modele (C1 / C2 / C3)
+        run: |
+          set -euo pipefail
+          python tools/controle_ci.py modele --rapport sorties/controle_modele.json
+
+      - name: Empreintes des artefacts
+        run: |
+          set -euo pipefail
+          sha256sum \
+            models/LinearSVC.pkl \
+            models/LinearSVC.metadata.json \
+            sorties/controle_donnees.json \
+            sorties/controle_modele.json \
+            > sorties/SHA256SUMS
+          cat sorties/SHA256SUMS
+
+      - name: Publication sur la release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ github.event.release.tag_name }}" \
+            models/LinearSVC.pkl \
+            models/LinearSVC.metadata.json \
+            sorties/controle_donnees.json \
+            sorties/controle_modele.json \
+            sorties/SHA256SUMS \
+            --repo "${{ github.repository }}" \
+            --clobber
+
+      # Lancement manuel : on ne publie PAS le pickle de 124 Mo en artefact.
+      # Les metadonnees et les rapports suffisent a juger de la conformite, et
+      # un binaire telechargeable sans release brouille la tracabilite.
+      - name: Artefacts du lancement manuel
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: controles-export-modele
+          path: |
+            models/LinearSVC.metadata.json
+            sorties/controle_donnees.json
+            sorties/controle_modele.json
+            sorties/SHA256SUMS
+          retention-days: 5
+
+      - name: Resume
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os, platform
+          from pathlib import Path
+
+          def lire(nom):
+              p = Path("sorties") / nom
+              if not p.exists():
+                  return None
+              try:
+                  return json.loads(p.read_text(encoding="utf-8"))
+              except json.JSONDecodeError:
+                  return None
+
+          donnees, modele = lire("controle_donnees.json"), lire("controle_modele.json")
+          print("## Export du modele LinearSVC\n")
+
+          if donnees is None:
+              print("- **C0** : non evalue (controle des donnees non atteint)")
+          else:
+              print(f"- **C0** : `{donnees['C0']}` "
+                    f"(release de donnees `{donnees['release_donnees']}`)")
+
+          if modele is None:
+              print("- **Verdict** : non evalue (controle du modele non atteint)")
+          else:
+              print(f"- **Verdict** : `{modele['VERDICT']}` "
+                    f"(C1=`{modele['C1']}`, C2=`{modele['C2']}`)")
+              print(f"- **Empreinte de contenu identique** : "
+                    f"`{modele['modele']['EMPREINTE_EGALE']}` (information)\n")
+              print("| jeu | n | divergences | taux d'accord | F1 reference | F1 obtenu | delta |")
+              print("|---|---|---|---|---|---|---|")
+              for nom, j in modele["jeux"].items():
+                  print(f"| {nom} | {j['n']} | {j['divergences']} | "
+                        f"{j['taux_accord']:.6f} | {j['f1_reference']:.10f} | "
+                        f"{j['f1_obtenu']:.10f} | {j['delta_f1']:+.6f} |")
+
+          env = (modele or donnees or {}).get("environnement")
+          print("\n### Environnement\n")
+          if env:
+              for cle, valeur in env.items():
+                  print(f"- {cle} : `{valeur}`")
+          else:
+              print(f"- python : `{platform.python_version()}`")
+              print(f"- plateforme : `{platform.platform()}`")
+
+          durees = [("preparation des donnees", os.environ.get("DUREE_DATA_PREP")),
+                    ("export du modele", os.environ.get("DUREE_EXPORT"))]
+          durees = [(n, v) for n, v in durees if v]
+          if durees:
+              print("\n### Durees\n")
+              for nom, valeur in durees:
+                  print(f"- {nom} : {valeur} s")
+          PY
