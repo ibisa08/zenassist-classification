@@ -512,6 +512,100 @@ lui-même (métadonnées, rapports, documentation de la release).
 
 ---
 
+## API de classification
+
+`api/` expose le modèle derrière une route HTTP. Le service charge le pickle
+**une fois au démarrage**, après avoir vérifié qu'il correspond à ses
+métadonnées.
+
+### Installation
+
+```bash
+.venv/bin/python -m pip install -r requirements-api.txt
+```
+
+[`requirements-api.txt`](requirements-api.txt) reprend `requirements.txt` puis
+ajoute FastAPI, Uvicorn et httpx. Les deux listes sont séparées à dessein :
+l'environnement de référence détermine l'artefact produit, un serveur web n'a
+aucun effet sur lui.
+
+### Récupération du modèle
+
+`models/` est exclu du dépôt. Le pickle et ses métadonnées se récupèrent depuis
+la release correspondante :
+
+```bash
+gh release download modele-v1.0.0 --pattern 'LinearSVC.*' --dir models
+```
+
+À défaut, `python tools/export_modele.py --modele LinearSVC` le reconstruit,
+ce qui suppose `data/processed/train.csv` présent.
+
+### Variables d'environnement
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `ZENASSIST_MODELE_PKL` | `models/LinearSVC.pkl` | chemin du pickle servi |
+| `ZENASSIST_MODELE_META` | `<pickle>.metadata.json` | chemin des métadonnées |
+
+### Lancement
+
+```bash
+.venv/bin/python -m uvicorn api.main:app --port 8000
+```
+
+Le démarrage échoue, volontairement, si l'une des deux vérifications ne passe
+pas : **empreinte sha256** du pickle égale à celle des métadonnées, et
+**version de scikit-learn** installée égale à celle inscrite dans les
+métadonnées. Un service qui démarrerait sans modèle répondrait des erreurs à
+l'usage, longtemps après que la cause est apparue dans les journaux.
+
+### Routes
+
+| Route | Corps attendu | Réponse |
+|---|---|---|
+| `POST /tags` | `{"user_claim": "<texte>"}` | `{"tag", "modele", "version_modele"}` |
+| `GET /health` | — | `{"statut", "modele", "sha256_pickle", "scikit_learn", "genere_le", "n_classes"}` |
+
+```bash
+curl -s -X POST localhost:8000/tags \
+  -H 'Content-Type: application/json' \
+  -d '{"user_claim": "I have been overdrawn at my bank and they charged me 380 dollars in fees."}'
+```
+
+`version_modele` est constitué des 12 premiers caractères du sha256 du pickle
+servi : il identifie sans ambiguïté le modèle qui a rendu la réponse.
+
+### Codes d'erreur
+
+| Code | Cas |
+|---|---|
+| `200` | classification réussie |
+| `422` | corps vide, champ `user_claim` absent, valeur non textuelle, texte vide ou fait d'espaces, texte au-delà de 32 000 caractères |
+
+Le plafond de 32 000 caractères est fixé au millier supérieur de la
+réclamation la plus longue du corpus d'entraînement, mesurée à 31 634
+caractères. Il n'exclut donc aucune réclamation du corpus.
+
+Les journaux portent une ligne par requête avec la durée de prédiction et
+l'étiquette rendue, **jamais le texte de la réclamation** : ces textes
+décrivent des situations financières personnelles, et les journaux d'un
+service survivent bien plus longtemps qu'on ne le prévoit.
+
+### Documentation interactive
+
+Le schéma OpenAPI et l'interface d'essai sont servis sur
+[`/docs`](http://localhost:8000/docs) une fois le service lancé.
+
+Les vérifications du service sont dans
+[`tests/test_api.py`](tests/test_api.py) :
+
+```bash
+.venv/bin/python tests/test_api.py
+```
+
+---
+
 ## Errata — 2026-08-19 (étape 2)
 
 Les chiffres de coût de ce README datent de l'étape 1 et reposaient sur des

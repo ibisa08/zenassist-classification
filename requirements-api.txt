@@ -1,0 +1,21 @@
+# Dependances du service HTTP qui sert le modele (dossier api/).
+#
+# Fichier SEPARE de requirements.txt a dessein. `requirements.txt` declare
+# l'environnement de REFERENCE : c'est lui que l'integration continue installe,
+# lui que `tools/export_modele.py` controle avant tout entrainement, et toute
+# version qui y figure determine l'artefact produit. Y ajouter un serveur web
+# ferait dependre la reproductibilite du modele de paquets qui n'ont aucun
+# effet sur lui.
+#
+# La premiere ligne reprend l'environnement de reference sans le dupliquer :
+# l'API charge le pickle et refuse de demarrer si la version de scikit-learn
+# installee n'est pas celle inscrite dans les metadonnees du modele. Deux
+# listes de versions divergeraient tot ou tard.
+#
+#     <chemin du .venv>/bin/python -m pip install -r requirements-api.txt
+#
+# Versions relevees le 2026-09-17, dernieres disponibles sur PyPI a cette date.
+-r requirements.txt
+fastapi==0.141.1
+uvicorn==0.53.0
+httpx==0.28.1

@@ -122,3 +122,55 @@ Verdict selon le protocole : C1 vérifié. Nouvelle référence : export du
 2026-09-17 sous scikit-learn 1.9.0. Métriques publiées inchangées.
 Réserve : mesures réalisées sous macOS ; la reproductibilité sous Linux sera
 contrôlée par l'intégration continue selon les mêmes critères.
+
+## Contrôle sous Linux (intégration continue)
+
+La réserve ci-dessus est levée. Le workflow `export-modele.yml` a rejoué la
+chaîne complète sur `ubuntu-latest` lors de la release `modele-v1.0.0` :
+téléchargement du corpus publié, `src.data_prep`, tests, export, puis les
+mêmes contrôles C0 et C1/C2/C3. Chiffres repris des assets
+`controle_donnees.json` et `controle_modele.json` de cette release.
+
+### Environnement du runner
+
+| Grandeur | macOS (référence) | Linux (intégration continue) |
+| --- | --- | --- |
+| plateforme | Darwin | Linux |
+| python | 3.13.5 | 3.13.15 |
+| scikit-learn | 1.9.0 | 1.9.0 |
+| numpy | 2.5.2 | 2.5.2 |
+| scipy | 1.18.0 | 1.18.0 |
+| pandas | 3.0.5 | 3.0.5 |
+
+### C0 — chaîne de données
+
+Les quatre empreintes sont égales à celles de la référence, y compris celle du
+corpus brut téléchargé depuis la release `data-v1`.
+
+**C0 = true.**
+
+### C1 — prédictions
+
+| Jeu | n | divergences | taux d'accord | F1 référence | F1 obtenu | delta |
+| --- | --- | --- | --- | --- | --- | --- |
+| `test` | 70863 | 0 | 1.0 | 0.8192847674418321 | 0.8192847674418321 | 0.0 |
+| `sample2000` | 2000 | 0 | 1.0 | 0.8187435068316256 | 0.8187435068316256 | 0.0 |
+
+Alignement par `complaint_id`, `ORDRE_ALIGNE` vrai sur les deux jeux.
+
+**VERDICT = C1.**
+
+### Empreintes du modèle Linux
+
+| Grandeur | Valeur |
+| --- | --- |
+| sha256 du pickle Linux | `b63addf5a508f1a78ef8805b9a2468e017f3191c1a62c543b3fd16effe81336c` |
+| sha256 du pickle de référence | `52504691ce1e914e2b939f81ceb24ffbee22609f47f060d646130cb4660bfb9e` |
+| empreinte de contenu Linux | `0ea0da08fa39aaec17ec08fc7a51c0d6270cb3f2b5970ba12913eb6b7e4c6aa3` |
+| empreinte de contenu de référence | `73a3831a69dc34e14d98d1e62e42a264a52682c28ffb00d58832afe23bf3fc74` |
+| `EMPREINTE_EGALE` | false |
+
+L'empreinte de contenu diffère entre macOS et Linux alors que les prédictions
+sont identiques : elle n'est pas portable d'une plateforme à l'autre et reste
+non décisionnelle, comme le prévoyait le protocole. Seule la comparaison des
+prédictions sert de critère.
