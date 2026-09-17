@@ -95,7 +95,7 @@ class Reponse(BaseModel):
     modele: str = Field(description="Nom du modele.", examples=["LinearSVC"])
     version_modele: str = Field(
         description="12 premiers caracteres du sha256 du pickle servi.",
-        examples=["52504691ce1e"])
+        examples=["0123456789ab"])
 
 
 class Etat(BaseModel):
