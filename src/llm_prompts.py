@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import re
 from functools import lru_cache
+from pathlib import Path
 
 from . import config as cfg
 
@@ -127,34 +128,100 @@ _DEFINITIONS = {
     "Vehicle loan or lease": "auto loans and leases: financing, repossession, title",
 }
 
-# --- v6 : few-shot, un exemple par classe -----------------------------------
+# --- styles few-shot : v6, v7, v8 -------------------------------------------
 # Les exemples vivent dans le PREFIXE, apres la liste des libelles et avant le
 # texte : ils sont constants d'un appel a l'autre, donc cacheables. Les y mettre
 # apres le texte casserait le cache et fausserait la mesure de latence.
-_EXEMPLES_FEWSHOT: list[tuple[str, str]] = []
+#
+# POURQUOI UNE LISTE ET NON UN DICTIONNAIRE PAR CLASSE
+# ----------------------------------------------------
+# La version precedente indexait les exemples par `{classe: texte}`. Une seconde
+# ligne portant la meme classe ECRASAIT SILENCIEUSEMENT la premiere : un jeu a
+# deux exemples par classe aurait produit un prefixe amputes de moitie sans
+# qu'aucun test ne le signale. La construction est passee en LISTE, ce qui rend
+# plusieurs exemples par classe possibles sans toucher au reste.
+#
+# L'ORDRE FAIT PARTIE DU PREFIXE LITTERAL, DONC DU CACHE
+# ------------------------------------------------------
+# Il est totalement determine : rang de la classe dans `CLASS_ORDER`, puis
+# `complaint_id` a l'interieur d'une classe. Aucune dependance a l'ordre des
+# lignes du CSV ni au systeme de fichiers. Pour un jeu a UN exemple par classe
+# -- le cas de v6 -- cet ordre est identique a celui de la version precedente,
+# et le prefixe de v6 reste inchange A L'OCTET PRES.
+#
+# MEMOISATION PAR CHEMIN
+# ----------------------
+# Un cache global unique rendait les exemples de v6 a un appel demandant ceux de
+# v7. Le cache est desormais indexe par chemin resolu.
+_CACHE_EXEMPLES: dict[Path, tuple[tuple[str, str], ...]] = {}
+
+# Fichier d'exemples de chaque style few-shot.
+_FICHIER_EXEMPLES = {
+    "v6_fewshot": cfg.LLM_FEWSHOT_FILE,
+    "v7_fewshot_court": cfg.LLM_FEWSHOT_V7_FILE,
+    "v8_fewshot_filtre": cfg.LLM_FEWSHOT_V8_FILE,
+}
+
+# Styles dont les exemples sont soumis au plafond de longueur.
+# v6 en est ABSENT a dessein : ses exemples ont ete tires sans plafond, ils sont
+# mesures, et son prefixe est GELE. Lui appliquer la garde le ferait echouer au
+# chargement et invaliderait retroactivement une campagne publiee.
+_STYLES_PLAFONNES = frozenset({"v7_fewshot_court", "v8_fewshot_filtre"})
 
 
-def charge_exemples_fewshot(chemin=None) -> list[tuple[str, str]]:
-    """Charge les exemples few-shot depuis le CSV, une seule fois.
+def charge_exemples_fewshot(chemin=None, *,
+                            plafond_mots: int | None = None
+                            ) -> list[tuple[str, str]]:
+    """Charge les exemples few-shot d'un CSV. Rend une liste (classe, texte).
 
-    Ces exemples viennent du TRAIN et sont EXCLUS du jeu de selection : un
-    exemple present dans les deux donnerait a v6 une reponse deja vue, et son
-    gain mesure serait un artefact.
+    Ces exemples viennent du TRAIN et sont EXCLUS des jeux de selection : un
+    exemple present dans les deux donnerait a la variante une reponse deja vue,
+    et son gain mesure serait un artefact.
+
+    Parameters
+    ----------
+    chemin : CSV a charger. Par defaut `cfg.LLM_FEWSHOT_FILE` (v6).
+    plafond_mots : si renseigne, LEVE des qu'un exemple depasse ce nombre de
+        mots. La garde est deliberement une exception et non une troncature :
+        `tronque()` ne s'applique JAMAIS au prefixe, un exemple trop long
+        gonflerait donc le prompt de TOUS les appels de la campagne. Mieux vaut
+        un echec au chargement qu'une facture decouverte apres coup.
+
+    Raises
+    ------
+    ValueError si un exemple depasse `plafond_mots`, ou si le CSV est vide.
     """
-    global _EXEMPLES_FEWSHOT
-    if _EXEMPLES_FEWSHOT:
-        return _EXEMPLES_FEWSHOT
     import csv
-    chemin = chemin or cfg.LLM_FEWSHOT_FILE
+    chemin = Path(chemin or cfg.LLM_FEWSHOT_FILE)
+    cle = chemin.resolve()
+    if cle in _CACHE_EXEMPLES:
+        return list(_CACHE_EXEMPLES[cle])
+
     with open(chemin, encoding="utf-8") as f:
         lignes = list(csv.DictReader(f))
-    # Ordre fige sur CLASS_ORDER : l'ordre des exemples fait partie du prefixe
-    # litteral, donc du cache. Un ordre dependant du systeme de fichiers
-    # produirait un prefixe different d'une execution a l'autre.
-    par_classe = {l[cfg.LABEL_COL]: l[cfg.TEXT_COL] for l in lignes}
-    _EXEMPLES_FEWSHOT = [(c, par_classe[c]) for c in cfg.CLASS_ORDER
-                         if c in par_classe]
-    return _EXEMPLES_FEWSHOT
+    if not lignes:
+        raise ValueError(f"{chemin} ne contient aucun exemple.")
+
+    inconnues = {l[cfg.LABEL_COL] for l in lignes} - set(cfg.CLASS_ORDER)
+    if inconnues:
+        raise ValueError(f"{chemin} : classe(s) hors CLASS_ORDER {sorted(inconnues)}.")
+
+    if plafond_mots is not None:
+        trop = [(l[cfg.ID_COL], len(l[cfg.TEXT_COL].split()))
+                for l in lignes if len(l[cfg.TEXT_COL].split()) > plafond_mots]
+        if trop:
+            raise ValueError(
+                f"{chemin.name} : {len(trop)} exemple(s) au-dessus du plafond de "
+                f"{plafond_mots} mots -- {trop}. Le plafond porte sur le PREFIXE, "
+                f"que `tronque()` ne raccourcit jamais : un exemple trop long "
+                f"alourdirait chaque appel de la campagne."
+            )
+
+    rang = {c: i for i, c in enumerate(cfg.CLASS_ORDER)}
+    lignes.sort(key=lambda l: (rang[l[cfg.LABEL_COL]], str(l[cfg.ID_COL])))
+    exemples = tuple((l[cfg.LABEL_COL], l[cfg.TEXT_COL]) for l in lignes)
+    _CACHE_EXEMPLES[cle] = exemples
+    return list(exemples)
 
 
 # --- correspondance style -> referentiel d'etiquettes -----------------------
@@ -190,6 +257,10 @@ _INSTRUCTIONS = {
     "v4_libelles_officiels": _INSTRUCTION_V1_EN,
     "v5_francais": _INSTRUCTION_V1_FR,
     "v6_fewshot": _INSTRUCTION_V1_EN,
+    # v7 et v8 : MEME instruction que v1 et v6. Seuls les EXEMPLES changent --
+    # c'est ce qui rend l'ecart entre les trois few-shot attribuable.
+    "v7_fewshot_court": _INSTRUCTION_V1_EN,
+    "v8_fewshot_filtre": _INSTRUCTION_V1_EN,
     # conserve : ancien nom de la variante francaise, utilise par les tests
     "v1_zeroshot_fr": _INSTRUCTION_V1_FR,
 }
@@ -226,12 +297,17 @@ def prefixe_fige(style: str = "v1_zeroshot",
 
     prefixe = f"{_INSTRUCTIONS[style]}\n\nCategories:\n{lignes}"
 
-    if style == "v6_fewshot":
+    if style in _FICHIER_EXEMPLES:
         # Exemples APRES les libelles, AVANT le texte : constants, donc dans la
-        # partie cacheable du prompt.
+        # partie cacheable du prompt. Le gabarit d'un bloc est IDENTIQUE pour
+        # v6, v7 et v8 : seul le contenu des exemples distingue les trois.
+        exemples = charge_exemples_fewshot(
+            _FICHIER_EXEMPLES[style],
+            plafond_mots=(cfg.LLM_FEWSHOT2_MAX_WORDS
+                          if style in _STYLES_PLAFONNES else None))
         blocs = "\n\n".join(
             f"Complaint: {t}\nAnswer: {{\"label\": \"{c}\"}}"
-            for c, t in charge_exemples_fewshot())
+            for c, t in exemples)
         prefixe += f"\n\nExamples:\n\n{blocs}"
     return prefixe
 

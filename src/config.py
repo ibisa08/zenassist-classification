@@ -645,6 +645,67 @@ LLM_FEWSHOT_PAR_CLASSE = 1
 LLM_FEWSHOT_SEED = 7
 LLM_FEWSHOT_FILE = PROCESSED_DIR / "train_fewshot_examples.csv"
 
+# --- SECOND jeu de SELECTION (etape 2, extension -- lot 1) -------------------
+# DIMENSIONNE, et non choisi : 1 835 lignes est le n qui donne 80 % de chances
+# de detecter un gain d'exactitude de 0,02 sous McNemar exact, correction de
+# Holm, famille de TROIS comparaisons, avec un taux de discordance de 6,75 %
+# (moyenne des b+c observes en phase 3 hors v3). A n = 200 la puissance pour ce
+# meme ecart valait 0,053 -- a peine au-dessus du risque de premiere espece.
+#
+# ALLOCATION PROPORTIONNELLE AU TRAIN, SANS PLANCHER, contrairement aux 200.
+# Le plancher de 12 servait a garantir un effectif minimal aux classes rares sur
+# un petit jeu ; a 1 835 lignes la classe la plus rare est deja largement
+# pourvue par le prorata, et le plancher ne ferait que deformer la population
+# sans contrepartie. Arrondi par la methode des PLUS FORTS RESTES
+# (`data_prep._repartition_plus_forts_restes`), qui totalise exactement n.
+#
+# Graine DISTINCTE de 1337 (jeu des 200) et de 7 (few-shot v6) : reutiliser une
+# graine sur le meme corpus trie de la meme facon reselectionnerait
+# preferentiellement les memes lignes.
+LLM_SELECTION2_SIZE = 1835
+LLM_SELECTION2_SEED = 2027
+LLM_SELECTION2_FILE = PROCESSED_DIR / "train_selection_1835.csv"
+
+# --- exemples few-shot de SECONDE generation (variantes v7 et v8) ------------
+# Deux bras qui ne different QUE par le critere de retenue, pour que l'ecart
+# entre eux soit attribuable :
+#   v7_fewshot_court  : premier candidat tire de chaque classe, aucun autre
+#                       critere. Bras "plafond de longueur seul".
+#   v8_fewshot_filtre : premier candidat de chaque classe que mistral-small-4,
+#                       interroge en zero-shot avec le prefixe v1_zeroshot
+#                       exact a temperature 0, etiquette correctement et de
+#                       facon IDENTIQUE sur 3 passes.
+# Critere de v8 fige AVANT tirage : un candidat que le modele classe mal ou
+# instablement sans aide est un candidat dont l'etiquette ne se deduit pas du
+# texte seul.
+LLM_FEWSHOT2_SEED = 4021
+LLM_FEWSHOT2_CANDIDATS_PAR_CLASSE = 5
+LLM_FEWSHOT2_PASSES_JUGE = 3
+LLM_FEWSHOT2_CANDIDATS_FILE = PROCESSED_DIR / "train_fewshot2_candidats.csv"
+LLM_FEWSHOT_V7_FILE = PROCESSED_DIR / "train_fewshot_v7.csv"
+LLM_FEWSHOT_V8_FILE = PROCESSED_DIR / "train_fewshot_v8.csv"
+
+# Plafond de longueur des exemples v7/v8, EN MOTS. Determine par la mesure
+# (section 3 du lot 1) et non par decret : le prefixe de v6 pese 2 519 mots
+# contre 180 pour v1, et `llm_prompts.tronque()` ne s'applique JAMAIS au
+# prefixe -- seulement au message `user`.
+#
+# 120 RETENU le 2026-09-03. v7 est le bras "plafond de longueur seul" : sa
+# fonction est d'isoler l'effet de la longueur PAR CONTRASTE avec v6. Le
+# contraste doit donc etre franc. Mesure sur les 283 220 lignes du train
+# restant, prefixe pire cas (9 exemples exactement au plafond) :
+#     plafond 200 -> 2 689 tokens, soit -17,5 % contre v6 (3 261)
+#     plafond 120 -> 1 833 tokens, soit -44,0 % contre v6
+# A -17,5 % un ecart mesure ne serait pas attribuable a la longueur.
+#
+# LIMITE ASSUMEE, a consigner dans tout rapport qui exploite v7 ou v8 : a
+# 120 mots, 7 classes sur 9 voient leurs exemples tires SOUS leur mediane de
+# longueur, et Mortgage (mediane 215 mots) sous son premier tiers. 43,5 % de la
+# population est eligible. Un exemple few-shot n'a pas vocation a etre
+# representatif de la longueur typique d'une reclamation, mais le biais est
+# reel et il est ecrit ici plutot que decouvert plus tard.
+LLM_FEWSHOT2_MAX_WORDS = 120
+
 # --- styles de prompt -------------------------------------------------------
 # Un style n'est FIGE qu'apres mise au point sur le jeu d'iteration. Le runner
 # REFUSE de demarrer sur `test_sample_2000.csv` avec un style absent de cet
