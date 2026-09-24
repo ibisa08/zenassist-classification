@@ -28,8 +28,8 @@ export default function TagSelector({ claim, onTagUpdate }) {
     const current = prediction && prediction.claimId === claim?.id ? prediction : null;
     const isPredicting = current?.status === 'loading';
     const predictionError = current?.status === 'error' ? current.message : null;
-    // Suggestion de l'IA, affichee dans le select mais PAS enregistree : tant
-    // que l'utilisateur n'a pas choisi lui-meme, la base garde claim.tag.
+    // Suggestion automatique, affichee mais PAS enregistree : tant que
+    // l'utilisateur n'a pas choisi lui-meme, la base garde claim.tag.
     const pendingTag = current?.status === 'done' ? current.tag : null;
 
     const handleTagSelect = async (tag) => {
@@ -111,7 +111,7 @@ export default function TagSelector({ claim, onTagUpdate }) {
                             disabled={isPredicting || isUpdating}
                         >
                             {isPredicting && <span className={styles.spinner} />}
-                            {isPredicting ? 'Analyse en cours...' : "Auto-etiqueter avec l'IA"}
+                            {isPredicting ? 'Analyse en cours...' : 'Auto-etiqueter'}
                         </button>
 
                         {predictionError && (
@@ -123,7 +123,7 @@ export default function TagSelector({ claim, onTagUpdate }) {
                         {pendingTag && !predictionError && (
                             <div className={styles.suggestionCard}>
                                 <p className={styles.suggestionLabel}>
-                                    Suggestion de l&apos;IA :{' '}
+                                    Suggestion automatique :{' '}
                                     <strong className={styles.suggestionTag}>{pendingTag}</strong>
                                 </p>
 

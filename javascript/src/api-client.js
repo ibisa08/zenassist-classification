@@ -35,15 +35,15 @@ export async function updateClaimTag(claimId, tag) {
 // technique est deja dans les logs serveur.
 const PREDICTION_ERRORS = {
   config_error: "L'auto-etiquetage n'est pas configure sur ce serveur.",
-  rate_limited: 'Quota Mistral atteint, reessayez dans un moment.',
-  upstream_error: 'Le service Mistral est indisponible, reessayez plus tard.',
-  network_error: 'Impossible de joindre Mistral, verifiez la connexion.',
-  parse_error: "L'IA n'a pas rendu de categorie exploitable, choisissez un tag manuellement.",
+  timeout: 'Le service de classification met trop de temps a repondre, reessayez.',
+  upstream_error: 'Le service de classification est indisponible, reessayez plus tard.',
+  network_error: 'Le service de classification est injoignable, verifiez qu\'il est demarre.',
+  parse_error: "Aucune categorie exploitable n'a ete rendue, choisissez un tag manuellement.",
   invalid_body: 'Cette reclamation ne contient pas de texte a analyser.',
 };
 
 /**
- * Demande une categorie a Mistral pour le texte d'une reclamation.
+ * Demande une categorie au service de classification pour le texte d'une reclamation.
  *
  * N'ENREGISTRE RIEN : la valeur rendue est une suggestion, la sauvegarde reste
  * le geste de l'utilisateur via updateClaimTag.
