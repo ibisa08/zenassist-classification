@@ -643,3 +643,24 @@ discriminant, la latence l'est.
 
 Source unique de vérité pour tout chiffre de coût : `src/config.py`
 (`MODELS_PRICING`, `PRICING_CHECKED_ON`, `CACHE_MESURE`).
+
+---
+
+## Livrables du projet
+
+| Mission | Livrable | Où le trouver |
+|---|---|---|
+| 1 — Exploration | Code Python de l'exploration | `notebooks/01_exploration.ipynb`, `src/`, `tools/` |
+| 1 — Exploration | Support de présentation | `livrables/ZenAssist_recommandation.pptx` |
+| 2 — Approche LLM | Plateforme avec étiquetage par LLM | `javascript/` au tag `mission2-llm` |
+| 3 — Approche ML | Service ML Python | `api/`, `tools/export_modele.py`, `.github/workflows/` |
+| 3 — Approche ML | Plateforme appelant le service Python | `javascript/` au tag `mission3-ml`, état courant de `main` |
+
+Pour consulter l'état d'une mission :
+
+    git checkout mission2-llm
+    git checkout mission3-ml
+    git checkout main
+
+Les mesures qui fondent la recommandation sont dans `reports/`, et les critères de
+reproductibilité dans `reports/protocole_alignement_env.md`.
