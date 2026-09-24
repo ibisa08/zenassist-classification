@@ -1,0 +1,57 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+}
+
+.header {
+  composes: header from '../styles/Header.module.css';
+}
+
+
+.inboxList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.inbox {
+  width: 100%;
+  padding: 14px 20px;
+  margin-bottom: 4px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  position: relative;
+}
+
+.inbox { composes: leftIndicator from '../styles/Indicator.module.css'; }
+
+.inbox:hover {
+  background: var(--background-tertiary);
+}
+
+.inbox.selected {
+  background: var(--primary-blue);
+  box-shadow: var(--shadow-md);
+}
+
+.inboxName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground-secondary);
+  letter-spacing: 0.2px;
+}
+
+.selected .inboxName {
+  color: var(--background);
+  font-weight: 500;
+}
+

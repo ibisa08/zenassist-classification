@@ -1,0 +1,28 @@
+{
+  "name": "dev-ia-p12",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:start": "docker-compose up -d",
+    "db:stop": "docker-compose down",
+    "db:reset": "node src/database/seed.js"
+  },
+  "dependencies": {
+    "@mistralai/mistralai": "^2.7.0",
+    "next": "15.4.5",
+    "pg": "^8.16.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "sql-template-strings": "^2.2.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "eslint": "^9",
+    "eslint-config-next": "15.4.5"
+  }
+}

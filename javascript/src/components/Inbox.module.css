@@ -1,0 +1,65 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+}
+
+.header {
+  composes: header from '../styles/Header.module.css';
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+
+.claimsList {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--background);
+  height: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.claimsList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.claimsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.claimsList::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.claimsList::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+.loading, .empty {
+  padding: 80px 24px;
+  text-align: center;
+  color: var(--foreground-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.loading::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 20px;
+  border: 3px solid var(--border-light);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

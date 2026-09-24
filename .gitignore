@@ -74,3 +74,14 @@ sorties/
 # --- systeme ---------------------------------------------------------------
 .DS_Store
 Thumbs.db
+
+# --- plateforme JavaScript --------------------------------------------------
+# Dependances et artefacts de build : reconstruits par npm install / npm run build.
+javascript/node_modules/
+javascript/.next/
+javascript/out/
+javascript/build/
+javascript/.turbo/
+javascript/coverage/
+javascript/next-env.d.ts
+javascript/*.tsbuildinfo

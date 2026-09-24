@@ -1,0 +1,303 @@
+.container {
+  width: 100%;
+  height: 100%;
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--foreground-muted);
+  padding: 40px;
+  text-align: center;
+  background: var(--background-secondary);
+}
+
+.placeholder h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground-secondary);
+  letter-spacing: 0.3px;
+}
+
+.header {
+  composes: header from '../styles/Header.module.css';
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--foreground);
+  letter-spacing: -0.3px;
+}
+
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--background-secondary);
+}
+
+.claimContent {
+  margin-bottom: 32px;
+}
+
+.claimContent h4 {
+  margin: 0 0 12px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.claimContent p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--foreground-secondary);
+  background: var(--background);
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.2px;
+}
+
+.tagSection h4 {
+  margin: 0 0 16px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+
+.tagSelector {
+  position: relative;
+  margin-top: 8px;
+}
+
+.select {
+  width: auto;
+  min-width: 200px;
+  padding: 12px 36px 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  appearance: none;
+}
+
+.chevronIcon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.select:hover {
+  border-color: var(--primary-blue);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px var(--primary-blue-light);
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--background-tertiary);
+}
+
+.select:disabled:hover {
+  border-color: var(--border-color);
+  box-shadow: none;
+}
+
+.updating {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--primary-blue);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.updating::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--primary-blue-light);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.prediction {
+  margin-bottom: 16px;
+}
+
+.predictButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--primary-blue);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  color: var(--primary-blue);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.predictButton:hover:not(:disabled) {
+  background: var(--primary-blue);
+  color: var(--background);
+}
+
+.predictButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-blue-light);
+}
+
+.predictButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--primary-blue-light);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.predictionError {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #d93025;
+  line-height: 1.5;
+}
+
+/* La suggestion vit HORS du dropdown : le select montre ce qui est
+   enregistre, cette carte montre ce qui est propose. Deux zones, deux sens. */
+.suggestionCard {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--primary-blue);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--background);
+}
+
+.suggestionLabel {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: var(--foreground-secondary);
+  line-height: 1.5;
+}
+
+.suggestionTag {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.suggestionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.validateButton,
+.ignoreButton,
+.removeButton {
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.validateButton {
+  border: 1px solid var(--primary-blue);
+  background: var(--primary-blue);
+  color: #fff;
+}
+
+.validateButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.ignoreButton {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--foreground-muted);
+}
+
+.ignoreButton:hover:not(:disabled) {
+  border-color: var(--foreground-muted);
+  color: var(--foreground-secondary);
+}
+
+.removeButton {
+  margin-top: 12px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: #d93025;
+}
+
+.removeButton:hover:not(:disabled) {
+  border-color: #d93025;
+  background: rgba(217, 48, 37, 0.06);
+}
+
+.validateButton:focus-visible,
+.ignoreButton:focus-visible,
+.removeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-blue-light);
+}
+
+.validateButton:disabled,
+.ignoreButton:disabled,
+.removeButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Les noms de keyframes sont scopes par fichier en CSS Modules : celui defini
+   dans Inbox.module.css n'est pas visible ici. Sans cette regle, `.spinner` et
+   `.updating::before` referencent une animation inexistante et ne tournent pas. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,24 @@
+.leftIndicator {
+  position: relative;
+}
+
+.leftIndicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--primary-blue);
+  transition: height 0.2s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+.leftIndicator:hover::before {
+  height: 70%;
+}
+
+.leftIndicator.selected::before {
+  height: 0%;
+}
